@@ -1,0 +1,58 @@
+schema_version: 1
+tag_convention: mn-<tool>:<tool-version-or-runtime-tag>
+
+# recipe values are paths in this repository; external means the app currently
+# relies on a locally supplied image recipe that is outside the two app trees.
+images:
+  scannet: {canonical: "mn-scannet:cpu", app: mn-protein-design, recipe: protein-design/scannet/Dockerfile, legacy: ["mnprot-scannet:latest"]}
+  surf2spot: {canonical: "mn-surf2spot:cu128", app: mn-protein-design, recipe: protein-design/surf2spot/Dockerfile, legacy: ["mnprot-surf2spot-cu128:latest"]}
+  pesto: {canonical: "mn-pesto:cu128", app: shared, recipe: shared/pesto/Dockerfile, legacy: ["mnprot-pesto-cu128:latest"]}
+  masif-seed: {canonical: "mn-masif-seed:cpu", app: mn-protein-design, recipe: protein-design/masif-seed/Dockerfile, legacy: ["masif_seed:latest"]}
+  genie3: {canonical: "mn-genie3:cu128", app: mn-protein-design, recipe: protein-design/genie3/Dockerfile, legacy: ["mnprot-genie3-cu128:latest"]}
+  pxdesign: {canonical: "mn-pxdesign:cu128", app: mn-protein-design, recipe: protein-design/pxdesign/Dockerfile, legacy: ["mnprot-pxdesign-cu128:latest"]}
+  protenix: {canonical: "mn-protenix:cu128", app: mn-protein-design, recipe: protein-design/protenix/Dockerfile, legacy: ["mnprot-protenix-cu128:latest"]}
+  protpardelle-1c: {canonical: "mn-protpardelle-1c:cu128", app: mn-protein-design, recipe: protein-design/protpardelle-1c/Dockerfile, legacy: ["mnprot-protpardelle-1c-cu128:latest"]}
+  biohub-esm: {canonical: "mn-biohub-esm:cu128", app: shared, recipe: shared/biohub-esm/Dockerfile, legacy: ["mnprot-biohub-esm-cu128:latest"]}
+  colabfold: {canonical: "mn-colabfold:1.6.1-cu12", app: mn-protein-design, recipe: protein-design/colabfold/Dockerfile, legacy: ["mnprot-colabfold-cuda12:1.6.1"]}
+  openfold3: {canonical: "mn-openfold3:cu13", app: mn-protein-design, recipe: protein-design/openfold3/Dockerfile, legacy: ["mnprot-openfold3-cu13:latest"]}
+  bindcraft2: {canonical: "mn-bindcraft2:4a56313-cu13", app: mn-protein-design, recipe: protein-design/bindcraft2/Dockerfile, legacy: ["mnprot-bindcraft2:4a56313"]}
+  alphafast: {canonical: "mn-alphafast:cu128", app: shared, recipe: shared/alphafast/Dockerfile, legacy: ["alphafast:latest"]}
+  boltz2: {canonical: "mn-boltz2:cu128", app: shared, recipe: shared/boltz2/Dockerfile, legacy: ["ovoex-boltz2:latest"]}
+  ligandmpnn: {canonical: "mn-ligandmpnn:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-ligandmpnn:latest"]}
+  foundry: {canonical: "mn-foundry:cu128", app: mn-protein-design, recipe: external, legacy: ["ovoex-foundry-cu128:latest"]}
+  bindcraft: {canonical: "mn-bindcraft:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-bindcraft:latest"]}
+  rfdiffusion: {canonical: "mn-rfdiffusion:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-rfdiffusion:latest"]}
+  boltzgen: {canonical: "mn-boltzgen:latest", app: mn-protein-design, recipe: external, legacy: ["boltzgen:latest"]}
+  proteina-complexa: {canonical: "mn-proteina-complexa:latest", app: mn-protein-design, recipe: external, legacy: ["ovoex-proteina-complexa:latest"]}
+  ipsae: {canonical: "mn-ipsae:latest", app: mn-protein-design, recipe: external, legacy: ["ovoex-ipsae:latest"]}
+  colabdesign: {canonical: "mn-colabdesign:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-colabdesign:latest"]}
+  python-structure: {canonical: "mn-python-structure:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-python-structure:latest"]}
+  structure: {canonical: "mn-structure:latest", app: mn-ligand, recipe: mn-ligand/structure/Dockerfile, legacy: ["ovolig-structure:latest"]}
+  docking: {canonical: "mn-docking:latest", app: mn-ligand, recipe: mn-ligand/docking/Dockerfile, legacy: ["ovolig-docking:latest"]}
+  docking-suite: {canonical: "mn-docking-suite:cu128", app: mn-ligand, recipe: mn-ligand/docking-suite/Dockerfile, legacy: ["avgu-docking-suite-cuda:latest"]}
+  openvs: {canonical: "mn-openvs:local", app: mn-ligand, recipe: mn-ligand/openvs/Dockerfile, legacy: ["openvs:local"]}
+  fpocket: {canonical: "mn-fpocket:4bb0d84", app: mn-ligand, recipe: mn-ligand/fpocket/Dockerfile, legacy: ["ovolig-fpocket:latest"]}
+  p2rank: {canonical: "mn-p2rank:d8c8e0d", app: mn-ligand, recipe: mn-ligand/p2rank/Dockerfile, legacy: ["ovolig-p2rank:latest"]}
+  md: {canonical: "mn-md:cu128", app: mn-ligand, recipe: mn-ligand/md/Dockerfile, legacy: ["ovolig-md-cu128:latest"]}
+  gromacs: {canonical: "mn-gromacs:2026.3-cu128", app: mn-ligand, recipe: mn-ligand/gromacs-md/Dockerfile, legacy: ["ovolig-gromacs-cu128:latest"]}
+  admet: {canonical: "mn-admet:latest", app: mn-ligand, recipe: mn-ligand/admet/Dockerfile, legacy: ["ovolig-admet:latest"]}
+  boltzina: {canonical: "mn-boltzina:cu128", app: mn-ligand, recipe: mn-ligand/boltzina/Dockerfile.cu128, legacy: ["ovolig-boltzina-cu128:latest"]}
+  nesso: {canonical: "mn-nesso:1.0.0-cu128", app: mn-ligand, recipe: mn-ligand/nesso/Dockerfile, legacy: ["ovolig-nesso-cu128:latest"]}
+  omtra: {canonical: "mn-omtra:cu128-745127d", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.omtra, legacy: ["ovolig-omtra-cu128:latest"]}
+  pocketxmol: {canonical: "mn-pocketxmol:cu128-65488cf", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.pocketxmol, legacy: ["ovolig-pocketxmol-cu128:latest"]}
+  flowr-root: {canonical: "mn-flowr-root:cu128-b2263e2", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.flowr_root, legacy: ["ovolig-flowr-root-cu128:latest"]}
+  conditar: {canonical: "mn-conditar:cu128-4294d286", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.conditar, legacy: ["ovolig-conditar-cu128:latest"]}
+  paopt: {canonical: "mn-paopt:cu128-4294d286", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.paopt, legacy: ["ovolig-paopt-cu128:latest"]}
+  drugrpg: {canonical: "mn-drugrpg:cu128-6fa0e41", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.drugrpg, legacy: ["ovolig-drugrpg-cu128:latest"]}
+  pfm: {canonical: "mn-pfm:cu128-33be6c1", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.pfm, legacy: ["ovolig-pfm-cu128:latest"]}
+  pocketflow: {canonical: "mn-pocketflow:cu128-a31a5a0", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.pocketflow, legacy: ["ovolig-pocketflow-cu128:latest"]}
+  lddm: {canonical: "mn-lddm:cu128-f254fb4", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.lddm, legacy: ["ovolig-lddm-cu128:latest"]}
+  pgmg: {canonical: "mn-pgmg:cu128-85fb712", app: mn-ligand, recipe: mn-ligand/generation/Dockerfile.pgmg, legacy: ["ovolig-pgmg-cu128:latest"]}
+  posebusters: {canonical: "mn-posebusters:1a5f26a", app: mn-ligand, recipe: mn-ligand/posebusters/Dockerfile, legacy: ["ovolig-posebusters:latest"]}
+  plip: {canonical: "mn-plip:latest", app: mn-ligand, recipe: mn-ligand/plip/Dockerfile, legacy: ["ovolig-plip:latest"]}
+  pandamap: {canonical: "mn-pandamap:0007347", app: mn-ligand, recipe: mn-ligand/pandamap/Dockerfile, legacy: ["ovolig-pandamap:latest"]}
+  qc: {canonical: "mn-qc:latest", app: mn-ligand, recipe: mn-ligand/qc/Dockerfile, legacy: ["ovolig-qc:latest"]}
+  abfe: {canonical: "mn-abfe:cu128", app: mn-ligand, recipe: mn-ligand/abfe/Dockerfile, legacy: ["ovolig-abfe-cu128:latest"]}
+  rbfe: {canonical: "mn-rbfe:cu128", app: mn-ligand, recipe: mn-ligand/rbfe/Dockerfile, legacy: ["ovolig-rbfe-cu128:latest"]}
+  boltzina-base: {canonical: "mn-boltzina-base:latest", app: mn-ligand, recipe: external, legacy: ["boltzina:latest"]}
+  plip-base: {canonical: "mn-plip-base:latest", app: mn-ligand, recipe: external, legacy: ["local-plip:latest"]}

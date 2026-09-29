@@ -1,0 +1,47 @@
+FROM mn-biohub-esm:cu128
+
+ARG SOURCE_COMMIT
+
+LABEL org.opencontainers.image.title="mn-ligand LDDM" \
+      org.opencontainers.image.description="LDDM pocket-conditioned ligand generation on CUDA 12.8 / NVIDIA Blackwell" \
+      org.opencontainers.image.revision="${SOURCE_COMMIT}" \
+      org.opencontainers.image.source="https://github.com/LPDI-EPFL/lddm"
+
+ENV ENGINE="lddm" \
+    CUDA_HOME="/usr/local/cuda" \
+    TORCH_CUDA_ARCH_LIST="8.9;12.0+PTX" \
+    PYTHONPATH="/opt/engine" \
+    PYTHONDONTWRITEBYTECODE="1" \
+    PYTHONUNBUFFERED="1"
+
+WORKDIR /opt/engine
+
+# The app base supplies PyTorch 2.7.1+cu128, which includes Blackwell support.
+# Install PyG extensions built for this exact CUDA/PyTorch ABI without letting
+# pip replace the base PyTorch build with LDDM's upstream cu124 pin.
+RUN python -m pip install --no-cache-dir --no-deps \
+      pyg_lib torch_scatter \
+      -f https://data.pyg.org/whl/torch-2.7.1+cu128.html \
+    && python -m pip install --no-cache-dir \
+      "torch-geometric==2.6.1" \
+      "lightning>=2.3.3" \
+      "rdkit==2023.9.6" \
+      "biopython==1.83" \
+      "prody>=2.4.1" \
+      "prolif==2.0.3" \
+      "posebusters==0.3.1" \
+      "useful-rdkit-utils==0.65" \
+      "fcd==1.2.2" \
+      "biotite>=1.5.0" \
+      "numpy>=1.23.5,<2" \
+      "scipy==1.13.0" \
+      "pandas==2.2.3" \
+      "pot==0.9.4" \
+      "einops>=0.8.0" \
+      tqdm setuptools
+
+COPY tools_to_implement/lddm/ /opt/engine/
+COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+
+ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
+CMD ["--help"]

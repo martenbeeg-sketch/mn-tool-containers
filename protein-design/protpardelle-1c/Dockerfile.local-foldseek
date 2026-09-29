@@ -1,0 +1,8 @@
+FROM mn-protpardelle-1c:pre-foldseek-cu128
+
+RUN wget -q https://mmseqs.com/foldseek/foldseek-linux-gpu.tar.gz \
+    && tar -xzf foldseek-linux-gpu.tar.gz -C /opt \
+    && rm foldseek-linux-gpu.tar.gz \
+    && ln -sf /opt/foldseek/bin/foldseek /usr/local/bin/foldseek
+
+ENV FOLDSEEK_BIN=/opt/foldseek/bin/foldseek
