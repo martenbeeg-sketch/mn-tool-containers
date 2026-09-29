@@ -1,0 +1,70 @@
+diff --git a/cli.py b/cli.py
+index 616b91e..c00a843 100644
+--- a/cli.py
++++ b/cli.py
+@@ -45,6 +45,12 @@ def create_parser():
+             "When using datasets, this is the number of systems to sample from the dataset."
+         )
+     )
++    parser.add_argument(
++        "--seed",
++        type=int,
++        default=2026,
++        help="Random seed for Python, NumPy, and PyTorch sampling",
++    )
+     parser.add_argument(
+         "--n_replicates",
+         type=int,
+@@ -365,6 +371,19 @@ def main():
+     # Otherwise, run the main sampling CLI
+     parser = create_parser()
+     args = parser.parse_args()
++
++    import os
++    import random
++
++    import numpy as np
++    import torch
++
++    os.environ["PYTHONHASHSEED"] = str(args.seed)
++    random.seed(args.seed)
++    np.random.seed(args.seed)
++    torch.manual_seed(args.seed)
++    if torch.cuda.is_available():
++        torch.cuda.manual_seed_all(args.seed)
+     
+     try:
+         run_sample(args)
+diff --git a/omtra/load/quick.py b/omtra/load/quick.py
+index 232e8f0..c24964c 100644
+--- a/omtra/load/quick.py
++++ b/omtra/load/quick.py
+@@ -109,7 +109,7 @@ def omtra_from_checkpoint(ckpt_path: str) -> OMTRA:
+     """
+ 
+     # load model
+-    model = OMTRA.load_from_checkpoint(ckpt_path)
++    model = OMTRA.load_from_checkpoint(ckpt_path, weights_only=False)
+ 
+     return model
+ 
+@@ -144,7 +144,7 @@ def omtra_from_partial_checkpoint(cfg: DictConfig, ckpt_path: str, secondary_ckp
+     """
+     model = omtra_from_config(cfg)
+ 
+-    ckpt1 = torch.load(ckpt_path, map_location="cpu")
++    ckpt1 = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+     state_dict1 = ckpt1["state_dict"] if "state_dict" in ckpt1 else ckpt1
+ 
+     excluded_keys = {"vector_field.task_embedding.weight"}
+@@ -165,7 +165,9 @@ def omtra_from_partial_checkpoint(cfg: DictConfig, ckpt_path: str, secondary_ckp
+     print(f"Missing keys: {len(missing_keys)}")
+ 
+     if secondary_ckpt_path is not None:
+-        ckpt2 = torch.load(secondary_ckpt_path, map_location="cpu")
++        ckpt2 = torch.load(
++            secondary_ckpt_path, map_location="cpu", weights_only=False
++        )
+         state_dict2 = ckpt2["state_dict"] if "state_dict" in ckpt2 else ckpt2
+ 
+         supplemental_state_dict = {

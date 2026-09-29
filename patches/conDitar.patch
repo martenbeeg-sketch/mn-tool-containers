@@ -1,0 +1,128 @@
+diff --git a/datasets/dataset.py b/datasets/dataset.py
+index f84bfb5..b66d672 100644
+--- a/datasets/dataset.py
++++ b/datasets/dataset.py
+@@ -66,7 +66,11 @@ class RawDataset(AbstractRawDataset):
+         self.model = PocketModel(config = self.config.pocket,
+                                 hydrogen = self.config.data.hydrogen)
+         # map_location lets CUDA-trained checkpoints load during CPU-only container runs.
+-        checkpoint = torch.load(self.ckpt_path, map_location=resolve_device())
++        checkpoint = torch.load(
++            self.ckpt_path,
++            map_location=resolve_device(),
++            weights_only=False,
++        )
+         try:
+             self.model.load_state_dict(checkpoint["state_dict"])
+         except:
+@@ -166,7 +170,7 @@ class ComplexDataset(AbstractComplexDataset):
+     def _build_model(self):
+         self.model = PocketModel(config = self.all_config.model,
+                                 hydrogen = self.all_config.data.hydrogen)
+-        checkpoint = torch.load(self.ckpt_path)
++        checkpoint = torch.load(self.ckpt_path, weights_only=False)
+         try:
+             self.model.load_state_dict(checkpoint["state_dict"])
+         except:
+diff --git a/scripts/conDitar/sample.py b/scripts/conDitar/sample.py
+index b9b16b2..e6b54a7 100644
+--- a/scripts/conDitar/sample.py
++++ b/scripts/conDitar/sample.py
+@@ -70,7 +70,11 @@ if __name__ == '__main__':
+     misc.seed_all(config.sample.seed)
+ 
+     # Load checkpoint
+-    ckpt = torch.load(config.model.checkpoint, map_location=args.device)
++    ckpt = torch.load(
++        config.model.checkpoint,
++        map_location=args.device,
++        weights_only=False,
++    )
+     if 'train_config' in config.model:
+         logger.info(f"Load training config from: {config.model['train_config']}")
+         ckpt['config'] = misc.load_config(config.model['train_config'])
+diff --git a/scripts/paOPT/sample_with_opt.py b/scripts/paOPT/sample_with_opt.py
+index 97f4d22..f837d04 100644
+--- a/scripts/paOPT/sample_with_opt.py
++++ b/scripts/paOPT/sample_with_opt.py
+@@ -30,7 +30,7 @@ from models.molopt_score_model import ScorePosNet3D, log_sample_categorical, ext
+ from models.molopt_score_model_opt import ScorePosNet3D_opt
+ from rdkit import Chem
+ from utils import eval_atom_type, scoring_func, analyze, eval_bond_length
+-from sample_diffusion_opt import *
++from scripts.paOPT.sample_diffusion_opt import *
+ import json
+ from admet_ai import ADMETModel
+ from contextlib import contextmanager
+@@ -266,6 +266,7 @@ def main():
+     parser.add_argument('--pdb_filename', type=str, default='xxx2/xxx2_protein.pdb')
+     # Reference Ligand
+     parser.add_argument('--sdf_filename', type=str, default='xxx2/xxx2_ligand.sdf')
++    parser.add_argument('--pocket_radius', type=int, default=10)
+     # Optimization steps
+     parser.add_argument('--opt_steps', type=int, default=3)
+     # Optimization learning rate
+@@ -293,7 +294,11 @@ def main():
+     misc.seed_all(args.seed)
+ 
+     # Load checkpoint
+-    ckpt = torch.load(config.model.checkpoint, map_location=args.device)
++    ckpt = torch.load(
++        config.model.checkpoint,
++        map_location=args.device,
++        weights_only=False,
++    )
+     if 'train_config' in config.model:
+         logger.info(f"Load training config from: {config.model['train_config']}")
+         ckpt['config'] = misc.load_config(config.model['train_config'])
+@@ -311,7 +316,13 @@ def main():
+     print(ckpt['config'])
+     pdb_path = os.path.join(args.protein_root, args.pdb_filename)
+     sdf_path = os.path.join(args.protein_root, args.sdf_filename)
+-    test_set = get_dataset(config=config, name='test', files=[(pdb_path, sdf_path)], ligand_transform=transform)
++    test_set = get_dataset(
++        config=config,
++        name='test',
++        files=[(pdb_path, sdf_path)],
++        radius=args.pocket_radius,
++        ligand_transform=transform,
++    )
+     
+     model = ScorePosNet3D_opt(
+         ckpt['config'],
+@@ -336,7 +347,7 @@ def main():
+         batch_size=args.batch_size, device=args.device,
+         num_steps=config.sample.num_steps,
+         center_pos_mode=config.sample.center_pos_mode,
+-        sample_num_atoms=config.sample.sample_num_atoms
++        sample_num_atoms=config.sample_num_atoms
+         )
+         # print variable types
+         print('init_ligand_pos type: ', type(init_ligand_pos))
+@@ -372,7 +383,7 @@ def main():
+             batch_size=args.batch_size, device=args.device,
+             num_steps=config.sample.num_steps,
+             center_pos_mode=config.sample.center_pos_mode,
+-            sample_num_atoms=config.sample.sample_num_atoms,
++            sample_num_atoms=config.sample_num_atoms,
+             init_ligand_pos=init_ligand_pos,
+             init_ligand_v=init_ligand_v,
+             gaussian_noise_traj=gaussian_noise_traj,
+@@ -598,7 +609,7 @@ def main():
+             # Call sample_wrapper directly (sequential execution)
+             result_path = sample_wrapper(model, data, args.num_samples,
+                                         args.batch_size, device, config.sample.num_steps,
+-                                        config.sample.center_pos_mode, config.sample.sample_num_atoms,
++                                        config.sample.center_pos_mode, config.sample_num_atoms,
+                                         init_ligand_pos_perturbed, init_ligand_v, gaussian_noise_traj_perturbed, gumbel_noise_traj_perturbed, ligand_num_atoms, ligand_cum_atoms, batch_ligand, i, args)
+             
+             # Read result from file
+@@ -829,7 +840,7 @@ def main():
+             batch_size=args.batch_size, device=args.device,
+             num_steps=config.sample.num_steps,
+             center_pos_mode=config.sample.center_pos_mode,
+-            sample_num_atoms=config.sample.sample_num_atoms,
++            sample_num_atoms=config.sample_num_atoms,
+             init_ligand_pos=init_ligand_pos,
+             init_ligand_v=init_ligand_v,
+             gaussian_noise_traj=gaussian_noise_traj,

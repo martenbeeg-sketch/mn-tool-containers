@@ -27,14 +27,36 @@ compose() {
   docker compose -f "$1/docker-compose.yml" build "${@:2}"
 }
 
+require_images() {
+  local image
+  for image in "$@"; do
+    if ! docker image inspect "$image" >/dev/null 2>&1; then
+      printf 'Required base image is missing: %s\n' "$image" >&2
+      printf 'Load or build that licensed base image, then rerun this command.\n' >&2
+      exit 1
+    fi
+  done
+}
+
+build_biohub_esm() {
+  if [[ "${MN_REBUILD_BIOHUB_ESM:-0}" != "1" ]] && docker image inspect mn-biohub-esm:3.4.1-cu128 >/dev/null 2>&1; then
+    printf 'Using existing mn-biohub-esm:3.4.1-cu128 image. Transfer this image separately when installing on another computer.\n'
+    printf 'Set MN_REBUILD_BIOHUB_ESM=1 to rebuild it from pinned public PyPI packages and Biohub ESM source.\n'
+    return
+  fi
+  compose "$PROTEIN_REPO" biohub-esm
+}
+
 case "$APP" in
   mn-protein-design)
-    compose "$PROTEIN_REPO" biohub-esm
+    build_biohub_esm
     compose "$LIGAND_REPO" alphafast boltz2 pesto
-    compose "$PROTEIN_REPO" scannet surf2spot masif-seed genie3 pxdesign protenix protpardelle-1c colabfold openfold3
+    require_images mn-python-structure:latest mn-bindcraft:latest mn-ipsae:latest
+    compose "$PROTEIN_REPO" scannet surf2spot masif-seed genie3 pxdesign protenix protpardelle-1c colabfold openfold3 boltzgen proteina-complexa
+    compose "$PROTEIN_REPO" scoring-python scoring-pyrosetta scoring-ipsae
     ;;
   mn-ligand)
-    compose "$PROTEIN_REPO" biohub-esm
+    require_images mn-biohub-esm:cu128
     compose "$LIGAND_REPO" alphafast boltz2 pesto
     compose "$LIGAND_REPO" conditar
     for image in mn-boltzina-base:latest mn-plip-base:latest; do

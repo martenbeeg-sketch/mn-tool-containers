@@ -35,7 +35,7 @@ RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Mi
 
 SHELL ["/bin/bash", "-lc"]
 
-COPY environment-cu128.yml /tmp/environment.yml
+COPY --from=app /containers/abfe/environment-cu128.yml /tmp/environment.yml
 RUN mamba env create -n "${CONDA_ENV_NAME}" -f /tmp/environment.yml && \
     mamba run -n "${CONDA_ENV_NAME}" python -c "import openmm; print('openmm', openmm.__version__)" && \
     mamba clean -a -y && \

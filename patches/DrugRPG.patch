@@ -1,0 +1,84 @@
+diff --git a/model/DrugRPG.py b/model/DrugRPG.py
+index f8d5f15..f0e1837 100644
+--- a/model/DrugRPG.py
++++ b/model/DrugRPG.py
+@@ -19,7 +19,6 @@ import pdb
+ from .transition import * 
+ from diffusion.guidance import *
+ from .loss import * 
+-from .ouroboros import GeminiMol
+ 
+ class DrugRPG(nn.Module):
+     def __init__(self, config, device='cpu',):
+@@ -34,9 +33,19 @@ class DrugRPG(nn.Module):
+         self.ligand_dynamics = DiffusionTransformer(h_input_dim=config.ligand_atom_dim, hidden_dim=config.ligand_hidden_dim, edge_input_dim=config.edge_input_dim, 
+                                                      edge_hidden_dim=config.edge_hidden_dim, dist_dim=config.dist_dim, n_layers=config.n_layers, p_n_layers=config.p_n_layers,
+                                                      n_heads=config.n_heads, p_input_dim=config.protein_atom_dim)
+-        self.ouroboros = GeminiMol(model_path=self.ouroboros_path, cache=False, threads=32)
+-        for param in self.ouroboros.parameters():
+-            param.requires_grad = False
++        # Ouroboros provides the representation-alignment term used only by
++        # ``forward`` during training.  Reverse-diffusion inference does not
++        # call it, so custom-pocket deployments may omit the historical DGL
++        # runtime by setting ``ouroboros_path`` to None.
++        self.ouroboros = None
++        if self.ouroboros_path:
++            from .ouroboros import GeminiMol
++
++            self.ouroboros = GeminiMol(
++                model_path=self.ouroboros_path, cache=False, threads=32
++            )
++            for param in self.ouroboros.parameters():
++                param.requires_grad = False
+         self.project_mlp = nn.Sequential(
+             nn.Linear(2048, 1024),
+             nn.SiLU(),
+@@ -746,4 +755,3 @@ def radius_based_constraints(pred_ligand_pos, pred_ligand_v, ligand_batch, k=2,
+ 
+     return torch.FloatTensor(pred_ligand_pos).to(device)
+ 
+-
+diff --git a/sample_for_pocket.py b/sample_for_pocket.py
+index 36730e2..94d62eb 100644
+--- a/sample_for_pocket.py
++++ b/sample_for_pocket.py
+@@ -143,9 +143,20 @@ def generate(args):
+ 
+     logging.info('Building model...')
+     # logging.info(f'Config Model: {config.model}')
+-    config.model['ouroboros_path'] = 'configs/Ouroboros'
++    # Ouroboros/DGL contributes only to the training-time representation loss;
++    # DrugRPG.ddpm_sample does not use it.
++    config.model['ouroboros_path'] = None
+     model = DrugRPG(config.model, device=device).to(device)
+-    model.load_state_dict(ckpt['model'])
++    incompatible = model.load_state_dict(ckpt['model'], strict=False)
++    unexpected = [
++        key for key in incompatible.unexpected_keys
++        if not key.startswith("ouroboros.")
++    ]
++    if incompatible.missing_keys or unexpected:
++        raise RuntimeError(
++            "Checkpoint mismatch outside inference-unused Ouroboros weights: "
++            f"missing={incompatible.missing_keys}, unexpected={unexpected}"
++        )
+     model.eval()
+ 
+     save_results = args.save_result
+@@ -186,7 +197,9 @@ def generate(args):
+         with torch.no_grad():
+             while num_samples > 0:
+                 try:
+-                    ligand_atom, ligand_pos, ligand_edge = model.ddpm_sample(batch, device)
++                    ligand_atom, ligand_pos, ligand_edge, _ = model.ddpm_sample(
++                        batch, device
++                    )
+                     
+                     ligand_atom_list = unbatch(ligand_atom, batch['ligand_atom_batch'])
+                     ligand_pos_list = unbatch(ligand_pos, batch['ligand_atom_batch'])
+@@ -301,5 +314,3 @@ if __name__ == '__main__':
+ 
+ 
+ 
+-
+-

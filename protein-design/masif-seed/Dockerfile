@@ -1,6 +1,8 @@
 # Base image (as in masif_seed instructions)
 FROM pymesh/pymesh:latest
 
+ARG MASIF_SEED_COMMIT=77153911d8252d02193a6d1d6d0539bf02c5faba
+
 # ---- Fix apt repos (base image uses Debian buster which is EOL -> 404 on normal mirrors) ----
 RUN sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list \
  && sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list \
@@ -84,10 +86,14 @@ RUN /usr/local/bin/python3.6 -m pip install --no-cache-dir \
     dask==1.2.2 \
     packaging
 
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/masif-seed.patch /opt/mn-tool-patches/masif-seed.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+ && mn-fetch-source https://github.com/LPDI-EPFL/masif_seed.git "${MASIF_SEED_COMMIT}" /opt/masif_seed masif-seed.patch
+
 # Optional sanity check (fails build early if env is inconsistent)
 RUN /usr/local/bin/python3.6 -c "import sys; import requests; import Bio; print(sys.version); print('requests', requests.__version__); print('biopython', Bio.__version__)"
 
-WORKDIR /
+WORKDIR /opt/masif_seed
 
 CMD ["bash"]
-

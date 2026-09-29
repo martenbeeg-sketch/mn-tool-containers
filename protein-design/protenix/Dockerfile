@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /opt/Protenix
+ARG PROTENIX_COMMIT=c3bfc365b3e1341a11935eddfe7bfdc308092147
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -20,7 +21,9 @@ RUN apt-get update \
         wget \
     && rm -rf /var/lib/apt/lists/*
 
-COPY tools_to_implement/Protenix/ /opt/Protenix/
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/bytedance/Protenix.git "${PROTENIX_COMMIT}" /opt/Protenix
 
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir --extra-index-url https://pypi.org/simple -r requirements.txt \

@@ -1,6 +1,6 @@
 FROM mn-biohub-esm:cu128
 
-ARG SOURCE_COMMIT
+ARG SOURCE_COMMIT=f254fb4f8525b3803e79eb95e9f1a163fe8b2459
 
 LABEL org.opencontainers.image.title="mn-ligand LDDM" \
       org.opencontainers.image.description="LDDM pocket-conditioned ligand generation on CUDA 12.8 / NVIDIA Blackwell" \
@@ -40,8 +40,10 @@ RUN python -m pip install --no-cache-dir --no-deps \
       "einops>=0.8.0" \
       tqdm setuptools
 
-COPY tools_to_implement/lddm/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/LPDI-EPFL/lddm.git "${SOURCE_COMMIT}" /opt/engine
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]

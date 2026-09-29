@@ -54,7 +54,7 @@ RUN git clone "${ALPHAFAST_REPOSITORY}" . && \
     git checkout --detach "${ALPHAFAST_SOURCE_COMMIT}" && \
     rm -rf .git
 
-COPY mmseqs-split-memory.patch /tmp/mmseqs-split-memory.patch
+COPY shared/alphafast/mmseqs-split-memory.patch /tmp/mmseqs-split-memory.patch
 RUN git apply /tmp/mmseqs-split-memory.patch && \
     rm /tmp/mmseqs-split-memory.patch
 

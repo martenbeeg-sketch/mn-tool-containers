@@ -10,7 +10,7 @@ LABEL org.opencontainers.image.source="mn-ligand"
 # its older Python/CUDA runtime with the same canonical Boltz-2 environment
 # used by mn-ligand. No model weights are stored in this image.
 COPY --from=canonical_boltz2 /opt/conda/envs/boltz2 /opt/conda/envs/boltz2
-COPY run_pose_rescoring.py /opt/mn-ligand/run_pose_rescoring.py
+COPY --from=app /containers/boltzina/run_pose_rescoring.py /opt/mn-ligand/run_pose_rescoring.py
 
 ENV PATH="/opt/conda/envs/boltz2/bin:${PATH}" \
     CUDA_HOME="/usr/local/cuda" \

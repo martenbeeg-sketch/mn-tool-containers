@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /opt/protpardelle-1c
+ARG PROTPARDELLE_COMMIT=ee378400f25b801fa481028000f9060183d7fb4c
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -20,13 +21,15 @@ RUN wget -q https://mmseqs.com/foldseek/foldseek-linux-gpu.tar.gz \
     && rm foldseek-linux-gpu.tar.gz \
     && ln -sf /opt/foldseek/bin/foldseek /usr/local/bin/foldseek
 
-COPY tools_to_implement/protpardelle-1c/ /opt/protpardelle-1c/
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/ProteinDesignLab/protpardelle-1c.git "${PROTPARDELLE_COMMIT}" /opt/protpardelle-1c
 
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir "huggingface_hub[cli]" \
     && python -m pip install --no-cache-dir -e .
 
-COPY containers/protpardelle-1c/entrypoint.sh /usr/local/bin/protpardelle-entrypoint
+COPY --from=app /containers/protpardelle-1c/entrypoint.sh /usr/local/bin/protpardelle-entrypoint
 
 ENV PROJECT_ROOT_DIR=/opt/protpardelle-1c \
     PROTPARDELLE_MODEL_PARAMS=/ref/protpardelle-1c/model_params \

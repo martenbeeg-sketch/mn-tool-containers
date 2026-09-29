@@ -4,6 +4,7 @@ FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-runtime
 
 ARG DEBIAN_FRONTEND=noninteractive
 ARG INSTALL_ESMFOLD=false
+ARG SURF2SPOT_COMMIT=a38a7a7bb704a1019a60cac669f33cdc1dd34f5a
 
 WORKDIR /opt/Surf2Spot
 
@@ -26,7 +27,10 @@ RUN apt-get update \
         wget \
     && rm -rf /var/lib/apt/lists/*
 
-COPY tools_to_implement/Surf2Spot/ /opt/Surf2Spot/
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/Surf2Spot.patch /opt/mn-tool-patches/Surf2Spot.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/AnwZhao/Surf2Spot.git "${SURF2SPOT_COMMIT}" /opt/Surf2Spot Surf2Spot.patch
 COPY --from=masif_deps /root/msms/msms.x86_64Linux2.2.6.1 /usr/local/bin/msms.x86_64Linux2.2.6.1
 COPY --from=masif_deps /usr/local/share/apbs/tools/bin/multivalue /usr/local/bin/multivalue
 
@@ -97,7 +101,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
           'openfold @ git+https://github.com/aqlaboratory/openfold.git@4b41059694619831a7db195b7e0988fc4ff3a307'; \
        fi
 
-COPY containers/surf2spot/entrypoint.sh /usr/local/bin/surf2spot-entrypoint
+COPY --from=app /containers/surf2spot/entrypoint.sh /usr/local/bin/surf2spot-entrypoint
 
 ENV PYTHONPATH=/opt/Surf2Spot \
     PATH=/opt/Surf2Spot/Surf2Spot/data/feature_extraction:$PATH \

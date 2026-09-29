@@ -20,8 +20,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VECLIB_MAXIMUM_THREADS=1
 
 WORKDIR /opt/posebusters
-COPY . /opt/posebusters
-RUN python -m pip install --no-cache-dir . gemmi
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/* \
+    && git init . \
+    && git remote add origin https://github.com/maabuu/posebusters.git \
+    && git fetch --depth 1 origin "${POSEBUSTERS_COMMIT}" \
+    && git checkout --detach FETCH_HEAD
+COPY support/mn-ligand/posebusters/mn_ligand_runner.py /opt/posebusters/mn_ligand_runner.py
+COPY --from=app /mn_ligand/workflows/posebusters_qualification.py /opt/posebusters/mn_ligand_qualification.py
+RUN python -m pip install --no-cache-dir . gemmi \
+    && rm -rf .git \
+    && apt-get purge -y git \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
 ENTRYPOINT ["python", "/opt/posebusters/mn_ligand_runner.py"]

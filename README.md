@@ -1,8 +1,10 @@
 # MN tool containers
 
 Central Dockerfile repository for the local `mn-protein-design` and `mn-ligand`
-apps. Images are built on the host and stay in its local Docker image store; no
-registry login or container upload is needed.
+apps. Tool source repositories are fetched at pinned commits during image
+builds; they do not need to be cloned beside the apps. Build patches and small
+app adapters live here. App-specific runtime data, model weights, and caches
+remain separate inputs.
 
 ## Checkout layout
 
@@ -15,11 +17,23 @@ git-projects/
   mn-tool-containers/
 ```
 
-The container repo owns Dockerfiles. Compose files in each app repo keep the
-correct build context, because some images copy code, wrappers, or pinned tool
-checkouts from that app. Clone the app repositories you plan to use before
-building. The protein and ligand apps share the Biohub ESM, PeSTo, AlphaFast,
-and Boltz-2 images.
+The container repo owns Dockerfiles, pinned source revisions, and local source
+patches. App Compose files use this repository as their Docker build context and
+pass a filtered app context only for launchers and environment files. Protein
+and ligand apps share PeSTo, AlphaFast, and Boltz-2 images. Protein Design uses
+a versioned Biohub ESM image; existing ligand images keep their older Biohub
+base image.
+
+Builds fetch upstream source at pinned revisions. The Protein Design Biohub
+ESM image, `mn-biohub-esm:3.4.1-cu128`, installs pinned PyPI releases of
+PyTorch and `esm` and fetches the matching binder-design tutorial from a pinned
+public Biohub ESM commit. It does not require a Biohub source checkout or
+private `Biohub/transformers` access. `build.sh` reuses an existing versioned
+image by default and rebuilds it only when `MN_REBUILD_BIOHUB_ESM=1` is set.
+Transfer the image separately when installing on another computer (`docker
+save` / `docker load`). Scoring
+wrappers and selected ligand images extend separately licensed base images; see
+the requirements below.
 
 ## Build images
 
@@ -28,6 +42,12 @@ Run a full build for either app:
 ```bash
 ./build.sh mn-protein-design
 ./build.sh mn-ligand
+```
+
+Check the pinned recipes and app Compose contexts with:
+
+```bash
+python -m pytest -q
 ```
 
 Build selected Compose services from the app repository when needed:
@@ -55,15 +75,17 @@ GPU tags identify the CUDA family when that affects compatibility; versioned
 tools include their upstream version or source revision. See [images.yaml](images.yaml)
 for the canonical name, app, build context, and any legacy tag.
 
-Two mn-ligand wrappers currently use locally supplied base images:
-`mn-boltzina-base:latest` and `mn-plip-base:latest`. The wrapper Dockerfiles
-remain here, while the base images must be built from their upstream setup or
-loaded from a local archive before building those wrappers. The migration script
-can retag the matching legacy base images if they are already installed.
+Some recipes extend locally supplied base images. Protein Design scoring
+wrappers need `mn-python-structure:latest`, `mn-bindcraft:latest`, and
+`mn-ipsae:latest`; Boltzina and PLIP retain their upstream base-image
+requirements. These bases contain separately licensed tools and can be loaded
+from image archives. The wrappers and pinned app source are in this repository.
 
 Model weights, reference files, user data, and simulation results are not stored
 in this repository or baked into these images unless an image's documented build
 option explicitly requests it.
+The Protein Design app keeps its public benchmark CSV under the managed app
+workdir and fetches it from a pinned source revision on first use.
 
 ## Hardware checks
 

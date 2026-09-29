@@ -1,6 +1,6 @@
 FROM mn-biohub-esm:cu128
 
-ARG SOURCE_COMMIT
+ARG SOURCE_COMMIT=65488cf635c856101dbe703ac97e2f10f58e005c
 
 LABEL org.opencontainers.image.title="mn-ligand PocketXMol generation engine" \
       org.opencontainers.image.description="PocketXMol CUDA 12.8 runtime for Ada and Blackwell GPUs" \
@@ -31,8 +31,11 @@ RUN python -m pip install --no-cache-dir \
       peptidebuilder pytorch-lightning pyyaml scikit-learn scipy seaborn \
       tensorboard torch-geometric==2.7.0 tqdm
 
-COPY tools_to_implement/PocketXMol/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/PocketXMol.patch /opt/mn-tool-patches/PocketXMol.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/pengxingang/PocketXMol.git "${SOURCE_COMMIT}" /opt/engine PocketXMol.patch
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]

@@ -51,6 +51,7 @@ RUN mamba create -y -n "${CONDA_ENV_NAME}" -c conda-forge python=3.10 pip && \
 RUN echo "source ${CONDA_DIR}/etc/profile.d/conda.sh && conda activate ${CONDA_ENV_NAME}" >> /root/.bashrc
 
 WORKDIR /work
+COPY support/protein-design/boltz2/prepare_inputs.py /opt/mn-protein-design/prepare_inputs.py
 
 ENTRYPOINT ["/bin/bash", "-lc", "source /opt/conda/etc/profile.d/conda.sh && conda activate boltz2 && exec boltz \"$@\"", "--"]
 CMD ["--help"]

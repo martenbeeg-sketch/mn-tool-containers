@@ -3,6 +3,7 @@ FROM mn-biohub-esm:cu128
 ARG ENGINE
 ARG SOURCE_DIR
 ARG SOURCE_COMMIT
+ARG SOURCE_REPOSITORY
 
 LABEL org.opencontainers.image.title="mn-ligand molecular generation engine" \
       org.opencontainers.image.description="CUDA 12.8 / Blackwell candidate runtime for pocket and pharmacophore-conditioned design" \
@@ -17,8 +18,12 @@ ENV ENGINE="${ENGINE}" \
     PYTHONUNBUFFERED="1"
 
 WORKDIR /opt/engine
-COPY ${SOURCE_DIR}/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && test -n "${SOURCE_REPOSITORY}" \
+    && test -n "${SOURCE_COMMIT}" \
+    && mn-fetch-source "${SOURCE_REPOSITORY}" "${SOURCE_COMMIT}" /opt/engine
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 # Preserve the CUDA 12.8 PyTorch stack supplied by the Blackwell base instead
 # of allowing the projects' historical environment files to downgrade it.

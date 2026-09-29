@@ -17,7 +17,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
        python3-pandas python3-gemmi python3-rdkit \
     && rm -rf /var/lib/apt/lists/*
-COPY mn_ligand_runner.py /opt/mn-ligand/mn_ligand_runner.py
+COPY support/mn-ligand/plip/mn_ligand_runner.py /opt/mn-ligand/mn_ligand_runner.py
 WORKDIR /workspace
 ENTRYPOINT ["python3", "/opt/mn-ligand/mn_ligand_runner.py"]
 CMD ["--help"]

@@ -3,6 +3,7 @@ FROM pytorch/pytorch:2.7.1-cuda12.8-cudnn9-devel
 ARG DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /opt/PXDesign
+ARG PXDESIGN_COMMIT=f788441313c84c3074fe9596ac2433f96b15c763
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -15,7 +16,9 @@ RUN apt-get update \
         wget \
     && rm -rf /var/lib/apt/lists/*
 
-COPY tools_to_implement/PXDesign/ /opt/PXDesign/
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/bytedance/PXDesign.git "${PXDESIGN_COMMIT}" /opt/PXDesign
 
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir \
@@ -56,7 +59,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
 
 RUN git clone -b v3.5.1 --depth 1 https://github.com/NVIDIA/cutlass.git /opt/cutlass
 
-COPY containers/pxdesign/entrypoint.sh /usr/local/bin/pxdesign-entrypoint
+COPY --from=app /containers/pxdesign/entrypoint.sh /usr/local/bin/pxdesign-entrypoint
 
 ENV CUTLASS_PATH=/opt/cutlass \
     PROTENIX_DATA_ROOT_DIR=/ref/pxdesign/release_data/ccd_cache \

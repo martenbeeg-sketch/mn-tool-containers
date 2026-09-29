@@ -1,6 +1,6 @@
 FROM mn-biohub-esm:cu128
 
-ARG SOURCE_COMMIT
+ARG SOURCE_COMMIT=4294d286375116942762b0688c4e012fceeec1c9
 
 LABEL org.opencontainers.image.title="mn-ligand conDitar generation engine" \
       org.opencontainers.image.description="Locally permissioned conDitar CUDA 12.8 runtime for Ada and Blackwell GPUs" \
@@ -28,8 +28,11 @@ RUN python -m pip install --no-cache-dir \
       easydict lmdb openbabel-wheel pandas pyyaml scikit-learn scipy \
       tensorboard torch-geometric==2.7.0 tqdm
 
-COPY tools_to_implement/conDitar-dev/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/conDitar.patch /opt/mn-tool-patches/conDitar.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/ninglab/conDitar-dev.git "${SOURCE_COMMIT}" /opt/engine conDitar.patch
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]

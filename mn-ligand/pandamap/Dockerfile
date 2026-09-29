@@ -19,11 +19,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     VECLIB_MAXIMUM_THREADS=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends dssp \
+    && apt-get install -y --no-install-recommends dssp git \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /opt/pandamap
-COPY . /opt/pandamap
-RUN python -m pip install --no-cache-dir . pandas gemmi rdkit
+ARG PANDAMAP_REPOSITORY=https://github.com/pritampanda15/PandaMap.git
+RUN git init . \
+    && git remote add origin "${PANDAMAP_REPOSITORY}" \
+    && git fetch --depth 1 origin "${PANDAMAP_COMMIT}" \
+    && git checkout --detach FETCH_HEAD
+COPY support/mn-ligand/pandamap/mn_ligand_runner.py /opt/pandamap/mn_ligand_runner.py
+RUN python -m pip install --no-cache-dir . pandas gemmi rdkit \
+    && rm -rf .git \
+    && apt-get purge -y git \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /workspace
 ENTRYPOINT ["python", "/opt/pandamap/mn_ligand_runner.py"]
 CMD ["--help"]

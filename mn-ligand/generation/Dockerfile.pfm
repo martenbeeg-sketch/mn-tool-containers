@@ -1,6 +1,6 @@
 FROM mn-biohub-esm:cu128
 
-ARG SOURCE_COMMIT
+ARG SOURCE_COMMIT=33be6c1f3dc9f42deb7a27be974ab9f5fc241497
 
 LABEL org.opencontainers.image.title="mn-ligand PFM generation engine" \
       org.opencontainers.image.description="PFM custom-pocket CUDA 12.8 runtime for Ada and Blackwell GPUs" \
@@ -28,8 +28,11 @@ RUN python -m pip install --no-cache-dir \
       easydict einops lmdb networkx openbabel-wheel pandas pyyaml \
       scikit-learn scipy torch-geometric==2.7.0 tqdm
 
-COPY tools_to_implement/PFM/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/PFM.patch /opt/mn-tool-patches/PFM.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/kurisu92725/PFM.git "${SOURCE_COMMIT}" /opt/engine PFM.patch
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]

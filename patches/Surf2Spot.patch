@@ -1,0 +1,176 @@
+diff --git a/Surf2Spot/data/get_atom_feature.py b/Surf2Spot/data/get_atom_feature.py
+index bc866f6..936049e 100644
+--- a/Surf2Spot/data/get_atom_feature.py
++++ b/Surf2Spot/data/get_atom_feature.py
+@@ -32,9 +32,15 @@ maxASA = {
+     'V': 174.0   # Valine
+ }
+ 
+-def insert_cryst1_line(pdb_path, cryst1_line="CRYST1"):
++def insert_cryst1_line(
++    pdb_path,
++    cryst1_line="CRYST1    1.000    1.000    1.000  90.00  90.00  90.00 P 1           1",
++):
+     with open(pdb_path, 'r') as f:
+         lines = f.readlines()
++
++    if lines and lines[0].startswith('CRYST1'):
++        return
+     
+     # 确保 CRYST1 行是正确的 80 列宽格式
+     if not cryst1_line.endswith('\n'):
+@@ -95,7 +101,7 @@ def extract_atom_coordinates(pdb_file):
+                             'atom_x': atom.coord[0],
+                             'atom_y': atom.coord[1],
+                             'atom_z': atom.coord[2],
+-                            'accessibility':normalized_asa[i],
++                            'accessibility': normalized_asa[i] if i < len(normalized_asa) else 0,
+                             'b_factor':atom.get_bfactor()
+                         })
+                     i += 1
+@@ -179,7 +185,11 @@ def to_one_hot(input_file,output_file):
+ 
+     # 初始化OneHotEncoder并指定所有可能的类别
+     aa_all_categories = ['A', 'C', 'D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']  # 总的类别列表
+-    encoder = OneHotEncoder(categories=[aa_all_categories], sparse_output=False)
++    encoder = OneHotEncoder(
++        categories=[aa_all_categories],
++        sparse_output=False,
++        handle_unknown='ignore',
++    )
+ 
+     # 对氨基酸类别进行one-hot编码
+     onehot_encoded = encoder.fit_transform(aa_column)
+@@ -204,7 +214,11 @@ def to_one_hot(input_file,output_file):
+ 
+     # 初始化OneHotEncoder并指定所有可能的类别
+     st_all_categories = ['H', 'B', 'E','G','I','S','T','blank']  # 总的类别列表
+-    encoder = OneHotEncoder(categories=[st_all_categories], sparse_output=False)
++    encoder = OneHotEncoder(
++        categories=[st_all_categories],
++        sparse_output=False,
++        handle_unknown='ignore',
++    )
+ 
+     # 对氨基酸类别进行one-hot编码
+     onehot_encoded = encoder.fit_transform(st_column)
+@@ -240,7 +254,11 @@ def atom_feature_engineering(output_dir):
+             if not os.path.exists(os.path.join(out2_path,pdb_name+'_combined_info_onehot_atom.csv')):
+                 dssp_file = os.path.join(output_dir,pdb_name+'.dssp')
+                 pdb_file = os.path.join(output_dir,pdb_name+'.pdb')
+-                os.system(f'mkdssp -i %s -o %s' %(pdb_file,dssp_file))
++                insert_cryst1_line(pdb_file)
++                try:
++                    os.system(f'mkdssp -i %s -o %s' %(pdb_file,dssp_file))
++                finally:
++                    remove_cryst1_line(pdb_file)
+                 output1_file = os.path.join(out2_path,pdb_name+'_combined_info_onehot_atom.csv')
+                 output2_file = os.path.join(out2_path,pdb_name+'_combined_info_onehot_atom.csv')
+         
+diff --git a/Surf2Spot/data/masif/computeAPBS.py b/Surf2Spot/data/masif/computeAPBS.py
+index 030ca09..afa42e3 100644
+--- a/Surf2Spot/data/masif/computeAPBS.py
++++ b/Surf2Spot/data/masif/computeAPBS.py
+@@ -3,6 +3,7 @@ import numpy as np
+ import subprocess
+ import pymesh
+ import tempfile
++import glob
+ 
+ #from deepdock.default_config.global_vars import apbs_bin, pdb2pqr_bin, multivalue_bin
+ import random
+@@ -30,9 +31,18 @@ def computeAPBS(vertices, pdb_file, apbs_bin, pdb2pqr_bin, multivalue_bin, workd
+         vertfile.write("{},{},{}\n".format(vert[0], vert[1], vert[2]))
+     vertfile.close()
+     
+-    cmd = multivalue_bin + " temp1.csv temp1.dx temp1_out.csv"
++    dx_file = "temp1.dx"
++    if not os.path.exists(os.path.join(workdir, dx_file)):
++        dx_candidates = sorted(glob.glob(os.path.join(workdir, "temp1*.dx")))
++        if dx_candidates:
++            dx_file = os.path.basename(dx_candidates[0])
++
++    cmd = multivalue_bin + f" temp1.csv {dx_file} temp1_out.csv"
+     p = subprocess.Popen([cmd], shell=True, cwd=workdir)
+     p.wait()
++
++    if not os.path.exists("%s/temp1_out.csv" % workdir):
++        return np.array([0.0] * len(vertices))
+     
+     # Read the charge file
+     chargefile = open("%s/temp1_out.csv"%workdir)
+diff --git a/Surf2Spot/run.py b/Surf2Spot/run.py
+index dd4461b..c40e0c3 100644
+--- a/Surf2Spot/run.py
++++ b/Surf2Spot/run.py
+@@ -1,6 +1,7 @@
+ import os
+ import typer
+ import subprocess
++import sys
+ from pathlib import Path
+ from Surf2Spot.tools.path_check import path_exists, mk_dir
+ from Surf2Spot.data.get_domain import get_domain_tsv
+@@ -69,7 +70,19 @@ def run_NB_craft(
+         surface_code = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/generate_surface.py')
+         print('===================running surface calculation===================')
+         check_surf2spot_tools_dependency()
+-        subprocess.run(f"conda run -n surf2spot_tools python {surface_code} -i {output_dir} -o {output_dir} --probe {probe}", shell=True)
++        subprocess.run(
++            [
++                sys.executable,
++                surface_code,
++                "-i",
++                str(output_dir),
++                "-o",
++                str(output_dir),
++                "--probe",
++                str(probe),
++            ],
++            check=True,
++        )
+         atom_feature_engineering(output_dir)
+         NB_surfpart(output_dir, domain_out_tsv, split_domain_length)
+ 
+@@ -189,7 +202,19 @@ def run_HS_craft(
+             surface_code = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/generate_surface.py')
+             print('===================running surface calculation===================')
+             check_surf2spot_tools_dependency()
+-            subprocess.run(f"conda run -n surf2spot_tools python {surface_code} -i {output_dir} -o {output_dir} --probe {probe}", shell=True)
++            subprocess.run(
++                [
++                    sys.executable,
++                    surface_code,
++                    "-i",
++                    str(output_dir),
++                    "-o",
++                    str(output_dir),
++                    "--probe",
++                    str(probe),
++                ],
++                check=True,
++            )
+             atom_feature_engineering(output_dir)
+             HS_surfpart(output_dir, domain_out_dir, split_top_rate)
+ 
+@@ -200,7 +225,19 @@ def run_HS_craft(
+             surface_code = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/generate_surface.py')
+             print('===================running surface calculation===================')
+             check_surf2spot_tools_dependency()
+-            subprocess.run(f"conda run -n surf2spot_tools python {surface_code} -i {output_dir} -o {output_dir} --probe {probe}", shell=True)
++            subprocess.run(
++                [
++                    sys.executable,
++                    surface_code,
++                    "-i",
++                    str(output_dir),
++                    "-o",
++                    str(output_dir),
++                    "--probe",
++                    str(probe),
++                ],
++                check=True,
++            )
+             atom_feature_engineering(output_dir)
+             NB_surfpart(output_dir, domain_out_tsv, split_domain_length)
+ 

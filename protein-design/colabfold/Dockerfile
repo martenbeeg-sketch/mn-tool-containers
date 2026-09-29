@@ -21,8 +21,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /cache /work
 
-COPY containers/colabfold/entrypoint.sh /usr/local/bin/colabfold-entrypoint
-COPY containers/colabfold/gpu-smoke-test.py /usr/local/bin/colabfold-gpu-smoke-test
+COPY support/shared/colabfold/entrypoint.sh /usr/local/bin/colabfold-entrypoint
+COPY support/shared/colabfold/gpu-smoke-test.py /usr/local/bin/colabfold-gpu-smoke-test
 RUN python -m pip install --no-cache-dir --upgrade "${JAX_CUDA_SPEC}" \
     && chmod +x /usr/local/bin/colabfold-entrypoint /usr/local/bin/colabfold-gpu-smoke-test \
     && python - <<'PY'

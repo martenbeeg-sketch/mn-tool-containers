@@ -1,6 +1,6 @@
 FROM mn-biohub-esm:cu128
 
-ARG SOURCE_COMMIT
+ARG SOURCE_COMMIT=a31a5a03f7d12e6e69af83bdf56d9b28ed936fc9
 
 LABEL org.opencontainers.image.title="mn-ligand PocketFlow" \
       org.opencontainers.image.description="PocketFlow inference on CUDA 12.8 / NVIDIA Blackwell" \
@@ -24,8 +24,11 @@ RUN python -m pip install --no-cache-dir \
     && python -m pip install --no-cache-dir "torch-geometric==2.6.1" \
     && python -m pip install --no-cache-dir easydict lmdb scipy tensorboard tqdm
 
-COPY tools_to_implement/PocketFlow/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/PocketFlow.patch /opt/mn-tool-patches/PocketFlow.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/Saoge123/PocketFlow.git "${SOURCE_COMMIT}" /opt/engine PocketFlow.patch
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]

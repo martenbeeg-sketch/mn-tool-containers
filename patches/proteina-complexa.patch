@@ -1,0 +1,18 @@
+diff --git a/src/proteinfoundation/cli/cli_runner.py b/src/proteinfoundation/cli/cli_runner.py
+index 668857a..e665d47 100644
+--- a/src/proteinfoundation/cli/cli_runner.py
++++ b/src/proteinfoundation/cli/cli_runner.py
+@@ -1655,9 +1655,12 @@ def _generate_env_sh(runtime: str, env_path: Path, env_sh_path: Path) -> None:
+             "# so re-derive it and all dependents from DOCKER_REPO_PATH.",
+             'export LOCAL_CODE_PATH="${DOCKER_REPO_PATH:-$LOCAL_CODE_PATH}"',
+             'export COMMUNITY_MODELS_PATH="${LOCAL_CODE_PATH}/community_models"',
+-            'export LOCAL_CACHE_DIR="${LOCAL_CODE_PATH}/.cache"',
++            'export LOCAL_CACHE_DIR="${DOCKER_CACHE_DIR:-$LOCAL_CODE_PATH/.cache}"',
+             'export CKPT_PATH="${DOCKER_CHECKPOINT_PATH:-$CKPT_PATH}"',
+             'export DATA_PATH="${DOCKER_DATA_PATH:-$DATA_PATH}"',
++            'export CACHE_DIR="${LOCAL_CACHE_DIR}"',
++            'export HF_HOME="${DOCKER_HF_HOME:-$LOCAL_CACHE_DIR}"',
++            'export HF_HUB_CACHE="${DOCKER_HF_HUB_CACHE:-$HF_HOME/hub}"',
+         ]
+ 
+     lines += [

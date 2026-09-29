@@ -6,6 +6,7 @@ ARG DOWNLOAD_TRAINING_DATA=false
 ARG INSTALL_COLABFOLD=true
 ARG INSTALL_BOLTZ2=true
 ARG BOLTZ2_ENV_NAME=boltz2
+ARG GENIE3_COMMIT=d77ae5ac04212ff1e8b29b585859a3244c614804
 
 WORKDIR /opt/genie3
 
@@ -25,7 +26,10 @@ RUN apt-get update \
         wget \
     && rm -rf /var/lib/apt/lists/*
 
-COPY tools_to_implement/genie3/ /opt/genie3/
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+COPY patches/genie3.patch /opt/mn-tool-patches/genie3.patch
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/aqlaboratory/genie3.git "${GENIE3_COMMIT}" /opt/genie3 genie3.patch
 
 RUN if [ "${INSTALL_COLABFOLD}" = "true" ]; then \
         conda install -c conda-forge -c bioconda \
@@ -90,7 +94,7 @@ RUN conda install -c conda-forge -c bioconda dssp -y \
     && ln -sf /opt/conda/bin/mkdssp /opt/genie3/packages/dssp-2.3.0/mkdssp \
     && conda clean -a -y
 
-COPY containers/genie3/entrypoint.sh /usr/local/bin/genie3-entrypoint
+COPY --from=app /containers/genie3/entrypoint.sh /usr/local/bin/genie3-entrypoint
 
 ENV PYTHONPATH=/opt/genie3/src:/opt/genie3/packages/ProteinMPNN:/opt/genie3/packages/IPSAE \
     XDG_CACHE_HOME=/cache/xdg-cache \

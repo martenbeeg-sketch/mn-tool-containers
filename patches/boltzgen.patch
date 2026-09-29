@@ -1,0 +1,52 @@
+diff --git a/config/fold.yaml b/config/fold.yaml
+index c81caff..c3aa447 100644
+--- a/config/fold.yaml
++++ b/config/fold.yaml
+@@ -51,4 +51,4 @@ sampling_steps: 200
+ diffusion_samples: 5
+ 
+ override:
+-  validators: null
+\ No newline at end of file
++  validators: null
+diff --git a/src/boltzgen/resources/config/fold.yaml b/src/boltzgen/resources/config/fold.yaml
+index c81caff..c3aa447 100644
+--- a/src/boltzgen/resources/config/fold.yaml
++++ b/src/boltzgen/resources/config/fold.yaml
+@@ -51,4 +51,4 @@ sampling_steps: 200
+ diffusion_samples: 5
+ 
+ override:
+-  validators: null
+\ No newline at end of file
++  validators: null
+diff --git a/src/boltzgen/task/predict/writer.py b/src/boltzgen/task/predict/writer.py
+index 0027958..f6c7b34 100755
+--- a/src/boltzgen/task/predict/writer.py
++++ b/src/boltzgen/task/predict/writer.py
+@@ -28,9 +28,15 @@ from boltzgen.model.modules.masker import BoltzMasker
+ class FoldingWriter(BasePredictionWriter):
+     """Custom writer for predictions."""
+ 
+-    def __init__(self, design_dir: str, designfolding: bool = False) -> None:
++    def __init__(
++        self,
++        design_dir: str,
++        designfolding: bool = False,
++        extra_eval_keys: List[str] | None = None,
++    ) -> None:
+         super().__init__(write_interval="batch")
+         self.designfolding = designfolding
++        self.extra_eval_keys = set(extra_eval_keys or [])
+         if design_dir is not None:
+             self.init_outdir(design_dir)
+ 
+@@ -64,7 +70,7 @@ class FoldingWriter(BasePredictionWriter):
+         pred_dict = {}
+         for key, value in prediction.items():
+             # check object is tensor
+-            if key in const.eval_keys:
++            if key in const.eval_keys or key in self.extra_eval_keys:
+                 pred_dict[key] = value.cpu().numpy()
+         np.savez_compressed(self.outdir / f"{batch['id'][0]}.npz", **pred_dict)
+ 

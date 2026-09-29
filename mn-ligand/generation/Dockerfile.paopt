@@ -17,8 +17,7 @@ RUN python -m pip install --no-cache-dir \
       seaborn typed-argument-parser \
     && python -m pip install --no-cache-dir admet-ai==1.4.0 --no-deps
 
-COPY tools_to_implement/conDitar-dev/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]

@@ -75,7 +75,7 @@ RUN wget -q https://github.com/conda-forge/miniforge/releases/latest/download/Mi
     bash /tmp/miniforge.sh -b -p "${CONDA_DIR}" && \
     rm -f /tmp/miniforge.sh
 
-COPY environment.yml /tmp/environment.yml
+COPY --from=app /containers/gromacs-md/environment.yml /tmp/environment.yml
 RUN mamba env create -f /tmp/environment.yml && \
     mamba clean -a -y && \
     rm -f /tmp/environment.yml && \

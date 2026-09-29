@@ -1,0 +1,29 @@
+diff --git a/src/genie3/evaluation/utils/secondary.py b/src/genie3/evaluation/utils/secondary.py
+index f9f0b36..fdff666 100644
+--- a/src/genie3/evaluation/utils/secondary.py
++++ b/src/genie3/evaluation/utils/secondary.py
+@@ -7,7 +7,7 @@ statistics for protein chains using the mkdssp executable.
+ 
+ import os
+ from pathlib import Path
+-from Bio.PDB import PDBParser, PDBIO
++from Bio.PDB import MMCIFParser, PDBParser, PDBIO
+ from Bio.PDB.DSSP import DSSP
+ 
+ 
+@@ -36,7 +36,7 @@ def assign_secondary_structure(
+               pi helix, turn, and bend
+     """
+     # Parse the structure and extract the requested chain
+-    parser = PDBParser(QUIET=True)
++    parser = MMCIFParser(QUIET=True) if str(filepath).lower().endswith((".cif", ".mmcif")) else PDBParser(QUIET=True)
+     structure = parser.get_structure("struct", filepath)
+     model = structure[0]
+ 
+@@ -66,4 +66,4 @@ def assign_secondary_structure(
+         f"{prefix}pct_pi_helix":           sse_str.count("I") / n,
+         f"{prefix}pct_turn":               sse_str.count("T") / n,
+         f"{prefix}pct_bend":               sse_str.count("S") / n,
+-    }
+\ No newline at end of file
++    }

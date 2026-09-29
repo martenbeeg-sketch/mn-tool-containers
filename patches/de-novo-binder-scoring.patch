@@ -1,0 +1,564 @@
+diff --git a/scripts/compute_rosetta_metrics.py b/scripts/compute_rosetta_metrics.py
+index 052c89e..894e1c2 100644
+--- a/scripts/compute_rosetta_metrics.py
++++ b/scripts/compute_rosetta_metrics.py
+@@ -49,7 +49,10 @@ def clean_pdb(pdb_file):
+         f_out.writelines(relevant)
+ 
+ def get_binder_id(pdb_path):
+-    return os.path.splitext(os.path.basename(pdb_path))[0]
++    binder_id = os.path.basename(pdb_path)
++    while binder_id.lower().endswith(".pdb"):
++        binder_id = binder_id[:-4]
++    return binder_id
+ 
+ # ============================================================
+ # Hotspots (distance-based)
+@@ -300,6 +303,7 @@ def process_one(pdb_file: str, relaxed_dir: str, binder_chain: str, target_chain
+         relaxed_pdb, binder_chain=binder_chain, target_chain=target_chain,
+         binder_hotspots=binder_hotspots, target_hotspots=target_hotspots
+     )
++    metrics.update({f"rosetta_interface_aa_{aa}": count for aa, count in interface_AA.items()})
+     return get_binder_id(pdb_file), {
+         "metrics": metrics,
+         "binder_hotspots": binder_hotspots_str,
+@@ -513,4 +517,3 @@ def main():
+     
+ if __name__ == "__main__":
+     main()
+-
+diff --git a/scripts/generate_model_inputs.py b/scripts/generate_model_inputs.py
+index 9067f1f..370ac62 100644
+--- a/scripts/generate_model_inputs.py
++++ b/scripts/generate_model_inputs.py
+@@ -26,23 +26,96 @@ def _safe_str(x) -> str:
+     return "" if pd.isna(x) or x is None else str(x)
+ 
+ 
++def _safe_int(x) -> int | None:
++    text = _safe_str(x).strip()
++    if not text:
++        return None
++    try:
++        return int(float(text))
++    except ValueError:
++        return None
++
++
++def _binder_chain_from_row(row: pd.Series) -> str:
++    return _safe_str(row.get("binder_chain")).strip() or "A"
++
++
++def _is_capacity_target_only(row: pd.Series) -> bool:
++    if _safe_str(row.get("target_source")).strip().lower() == "capacity_target_only":
++        return True
++    return _safe_str(row.get("capacity_target_only")).strip().lower() in {"1", "true", "yes", "y"}
++
++
++def _sequence_for_chain(row: pd.Series, chain: str, binder_chain: str) -> str:
++    """Return the sequence for a declared chain, handling imported non-A binders."""
++    candidates = []
++    target_only = _is_capacity_target_only(row)
++    if target_only:
++        candidates.extend([f"target_subchain_{chain}_seq", f"{chain}_seq"])
++        if chain == binder_chain:
++            candidates.extend(["binder_sequence", "sequence"])
++            if chain == "A":
++                candidates.append("A_seq")
++    elif chain == binder_chain:
++        candidates.extend([f"{chain}_seq", f"target_subchain_{chain}_seq", "binder_sequence", "sequence"])
++        if chain == "A":
++            candidates.append("A_seq")
++    else:
++        # Fragment-aware app rows can keep legacy combined target fields such as
++        # B_seq/B_length while also carrying explicit target_subchain_B_seq/_len.
++        # For model inputs, the explicit fragment chain wins; PAE/template/MSA
++        # order must follow the staged chain list, not the old combined target.
++        candidates.extend([f"target_subchain_{chain}_seq", f"{chain}_seq"])
++    for column in candidates:
++        value = _safe_str(row.get(column))
++        if value:
++            if target_only or chain != binder_chain:
++                declared_length = _safe_int(row.get(f"target_subchain_{chain}_len"))
++                if declared_length is None:
++                    declared_length = _safe_int(row.get(f"{chain}_length"))
++                if declared_length is not None and declared_length != len(value):
++                    raise ValueError(
++                        f"{row.get('binder_id')}: selected target chain {chain} sequence length "
++                        f"{len(value)} does not match declared {chain}_length={declared_length}."
++                    )
++            return value
++    return ""
++
++
+ def _chains_from_row(row: pd.Series) -> List[str]:
+     """
+     Deduce chain letters to process for this row:
+     - binder_chain first (if present)
++    - for target-only capacity/refolding rows, target_chains is canonical;
++      legacy rows may still store target fragments in binder_chains
+     - then chains listed in target_chains (if JSON-parsable)
+     - else, any chains implied by 'msa_path_<X>' or 'target_subchain_<X>_seq' columns.
+     """
+     seen = []
+     bc = str(row.get("binder_chain", "")).strip()
+-    if bc:
++    target_only = _is_capacity_target_only(row)
++    if bc and not target_only:
+         seen.append(bc)
+ 
+     tchains = []
++    if target_only:
++        for column in ("target_chains", "target_only_chains", "legacy_capacity_binder_chains", "binder_chains"):
++            raw_chains = row.get(column, "")
++            try:
++                tchains = [c.strip() for c in json.loads(raw_chains) if isinstance(c, str) and c.strip()]
++            except Exception:
++                tchains = [c.strip() for c in str(raw_chains).split(",") if c.strip()]
++            if tchains:
++                break
++
+     tc = row.get("target_chains", "")
+-    try:
+-        tchains = [c.strip() for c in json.loads(tc) if isinstance(c, str) and c.strip()]
+-    except Exception:
++    if not tchains:
++        try:
++            tchains = [c.strip() for c in json.loads(tc) if isinstance(c, str) and c.strip()]
++        except Exception:
++            tchains = []
++
++    if not tchains:
+         # Fall back: infer from columns
+         for c in row.index:
+             m1 = re.match(r"msa_path_([A-Za-z])$", c)
+@@ -101,23 +174,12 @@ def write_colabfold_inputs(csv_file: str, outpath: str) -> None:
+             print(f"[colabfold] {binder_id}: no chains detected; skipping.")
+             continue
+ 
+-        binder_chain = _safe_str(row.get("binder_chain"))
++        binder_chain = _binder_chain_from_row(row)
++        target_only = _is_capacity_target_only(row)
+ 
+         for chain in chains:
+             # choose sequence column
+-            if chain == binder_chain:
+-                seq_col = f"{binder_chain}_seq"
+-            else:
+-                tcol = f"target_subchain_{chain}_seq"
+-                if tcol in df.columns and _safe_str(row.get(tcol)):
+-                    seq_col = tcol
+-                elif f"{chain}_seq" in df.columns:
+-                    seq_col = f"{chain}_seq"
+-                else:
+-                    print(f"[colabfold] {binder_id}: no sequence column for chain {chain}; skipping chain.")
+-                    continue
+-
+-            seq = _safe_str(row.get(seq_col))
++            seq = _sequence_for_chain(row, chain, binder_chain)
+             if not seq:
+                 print(f"[colabfold] {binder_id}: empty sequence for chain {chain}; skipping chain.")
+                 continue
+@@ -125,7 +187,9 @@ def write_colabfold_inputs(csv_file: str, outpath: str) -> None:
+             csv_chains.append(seq)
+             chain_lengths.append(len(seq))
+ 
+-            msa_file = _resolve_msa_path(row, chain)
++            # Binder candidates are designed sequences: keep the query sequence,
++            # but never attach a homolog MSA for the binder chain.
++            msa_file = "" if chain == binder_chain and not target_only else _resolve_msa_path(row, chain)
+             block = ""
+             if (not msa_file) or (os.path.splitext(msa_file)[1].lower() not in [".a3m", ".fasta", ".fa", ".faa"]):
+                 # No usable file -> single-sequence block
+@@ -203,7 +267,8 @@ def write_boltz1_fastas(inpath: str, outpath: str):
+ 
+     for _, row in df.iterrows():
+         binder_id = row["binder_id"]
+-        binder_chain = _safe_str(row.get("binder_chain"))
++        binder_chain = _binder_chain_from_row(row)
++        target_only = _is_capacity_target_only(row)
+         chains = set(_chains_from_row(row))
+         if binder_chain:
+             chains.add(binder_chain)
+@@ -212,15 +277,11 @@ def write_boltz1_fastas(inpath: str, outpath: str):
+         fasta_lines: List[str] = []
+         for chain in chains:
+             msa_path_col = f"msa_path_{chain}"
+-            # sequence selection
+-            if chain == binder_chain:
+-                seq = _safe_str(row.get(f"{binder_chain}_seq")) or _safe_str(row.get("A_seq"))
+-            else:
+-                seq = _safe_str(row.get(f"target_subchain_{chain}_seq")) or _safe_str(row.get(f"{chain}_seq"))
++            seq = _sequence_for_chain(row, chain, binder_chain)
+             if not seq:
+                 continue
+ 
+-            msa_path = _safe_str(row.get(msa_path_col))
++            msa_path = "" if chain == binder_chain and not target_only else _safe_str(row.get(msa_path_col))
+             header = f">{chain}|protein|{'empty' if (not msa_path or msa_path.lower()=='no_msa') else msa_path}"
+             fasta_lines.append(header)
+             fasta_lines.append(seq)
+@@ -267,8 +328,9 @@ def write_af3_json(inpath: str, outpath: str):
+     for _, row in df.iterrows():
+         binder_id = row["binder_id"]
+ 
+-        binder_chain = _safe_str(row.get("binder_chain")) or "A"
+-        binder_seq = _safe_str(row.get(f"{binder_chain}_seq")) or _safe_str(row.get("A_seq"))
++        binder_chain = _binder_chain_from_row(row)
++        target_only = _is_capacity_target_only(row)
++        binder_seq = _sequence_for_chain(row, binder_chain, binder_chain)
+         if not binder_seq:
+             print(f"[af3] {binder_id}: missing binder sequence; skipping.")
+             continue
+@@ -286,7 +348,7 @@ def write_af3_json(inpath: str, outpath: str):
+         for ch in chains:
+             if ch == binder_chain:
+                 continue
+-            seq = _safe_str(row.get(f"target_subchain_{ch}_seq"))
++            seq = _sequence_for_chain(row, ch, binder_chain)
+             if not seq:
+                 continue
+             sequences.append({
+@@ -337,7 +399,7 @@ def write_af3_json(inpath: str, outpath: str):
+             if "protein" in seq:
+                 cid = seq["protein"]["id"]
+                 msa_col = f"msa_path_{cid}"
+-                msa_path = _safe_str(row.get(msa_col))
++                msa_path = "" if cid == binder_chain and not target_only else _safe_str(row.get(msa_col))
+                 if (not msa_path) or (msa_path.lower() == "no_msa"):
+                     seq["protein"]["unpairedMsa"] = ""
+                     seq["protein"]["pairedMsa"] = ""
+diff --git a/scripts/pymol_metrics.py b/scripts/pymol_metrics.py
+index 41010ef..8d2ba31 100644
+--- a/scripts/pymol_metrics.py
++++ b/scripts/pymol_metrics.py
+@@ -137,17 +137,12 @@ def compute_ss_percentages(residues_str, chain_ss_dict):
+             ss = ss.upper()
+             if ss in ["H"]:
+                 helix_count += 1 # CHECK THIS
+-            elif ss in ["S"]:
++            elif ss in ["S", "E"]:
+                 sheet_count += 1
+-            elif ss in ["L"]:
+-                loop_count += 1
+             else:
+-                print(f"{ss} not found in H,L,S possible codes")    
++                loop_count += 1
+         else:
+-            print(f"{res} not found in dict")
+-            # Optionally, if the residue isn't found, you could decide to count it as loop
+-            # or simply ignore it. Here we ignore missing residues.
+-            continue
++            loop_count += 1
+     
+ 
+     #print(f"length of interface residues {len(res_ids)}, helix {helix_count}, {sheet_count}, {loop_count} sum {helix_count+sheet_count+loop_count}")
+@@ -201,7 +196,9 @@ def process_pdb_directory(pdb_dir, prefix, file_handle):
+         if pdb.endswith(".pdb"):
+             pdb_path = os.path.join(pdb_dir, pdb)
+             # Use only the pdb file's basename as the model id.
+-            binder_id = os.path.splitext(pdb)[0]
++            binder_id = pdb
++            while binder_id.lower().endswith(".pdb"):
++                binder_id = binder_id[:-4]
+             
+             
+             # Bound state: calculate SASA for binder (chain A) and target (chain B)
+@@ -278,4 +275,4 @@ for prefix, pdb_dir in pdb_dict.items():
+     with open(output_file, "w") as f:
+         f.write(header)
+         process_pdb_directory(pdb_dir, prefix, f)
+-    print(f"Metrics saved to {output_file}")
+\ No newline at end of file
++    print(f"Metrics saved to {output_file}")
+diff --git a/scripts/run_ipsae_batch.py b/scripts/run_ipsae_batch.py
+index 2ec73c6..31f4361 100644
+--- a/scripts/run_ipsae_batch.py
++++ b/scripts/run_ipsae_batch.py
+@@ -80,6 +80,8 @@ def build_file_index(boltz_dir: Optional[str], af3_dir: Optional[str], colab_dir
+         boltz_pattern = os.path.join(boltz_root, 'predictions', '**', '*')
+         for path in glob.glob(boltz_pattern, recursive=True):
+             base = os.path.basename(path)
++            if '_targetgroup_' in base:
++                continue
+             if base.endswith('_model_0.cif'):
+                 bid = base.replace('_model_0.cif', '')
+                 index['boltz'].setdefault(bid, {})['structure'] = path
+@@ -91,6 +93,8 @@ def build_file_index(boltz_dir: Optional[str], af3_dir: Optional[str], colab_dir
+         af3_pattern = os.path.join(af3_dir, '**', '*')
+         for path in glob.glob(af3_pattern, recursive=True):
+             base = os.path.basename(path)
++            if '_targetgroup_' in base:
++                continue
+             if base.endswith('_confidences.json'):
+                 bid = base.replace('_confidences.json', '')
+                 index['af3'].setdefault(bid, {})['confidence'] = path
+@@ -102,6 +106,8 @@ def build_file_index(boltz_dir: Optional[str], af3_dir: Optional[str], colab_dir
+         colab_pattern = os.path.join(colab_dir, '*')
+         for path in glob.glob(colab_pattern):
+             base = os.path.basename(path)
++            if '_targetgroup_' in base:
++                continue
+             if '_scores_rank_001' in base and base.endswith('.json'):
+                 bid = base.split('_scores_rank_001')[0]
+                 entry = index['colab'].setdefault(bid, {})
+@@ -171,7 +177,7 @@ def locate_files(bid: str, index) -> Tuple[List[Tuple[str,str,str,str]], List[st
+ 
+ def expected_txt_path(struct_path: str, pae_cutoff: float, dist_cutoff: float) -> Path:
+     stem = Path(struct_path).with_suffix('').name
+-    return Path(struct_path).with_name(f"{stem}_pae{int(pae_cutoff):02d}_dist{int(dist_cutoff):02d}.txt")
++    return Path(struct_path).with_name(f"{stem}_{int(pae_cutoff):02d}_{int(dist_cutoff):02d}.txt")
+ 
+ 
+ def calculate_ipsae(conf: str, struct: str, pae_cutoff: float, dist_cutoff: float, script_path: str, overwrite: bool, verbose: bool):
+@@ -185,6 +191,119 @@ def calculate_ipsae(conf: str, struct: str, pae_cutoff: float, dist_cutoff: floa
+         print("  - RUN:", " ".join(map(str, cmd)))
+     subprocess.run(cmd, check=True)
+ 
++def parse_chain_list(value) -> List[str]:
++    if value is None:
++        return []
++    if isinstance(value, float) and pd.isna(value):
++        return []
++    text = str(value).strip()
++    if not text or text.lower() in {"nan", "none", "null"}:
++        return []
++    if text.startswith("["):
++        try:
++            parsed = json.loads(text)
++            if isinstance(parsed, list):
++                return [str(item).strip() for item in parsed if str(item).strip()]
++        except Exception:
++            pass
++    return [part.strip().strip("'\"") for part in text.replace(";", ",").split(",") if part.strip().strip("'\"")]
++
++def collapse_target_chains_for_group_scoring(struct_path: str, binder_chain: str, target_chains: List[str]) -> str:
++    """
++    Return a scoring-only structure where all declared target fragments share one chain ID.
++
++    The PAE matrix is indexed by residue/token order, not chain labels. Rewriting only the
++    chain labels therefore preserves the matrix alignment while making ipSAE, pDockQ2,
++    pDockQ, LIS, and iPAE score binder-vs-whole-target instead of binder-vs-fragment
++    followed by post-hoc aggregation.
++    """
++    target_group = [chain for chain in target_chains if chain and chain != binder_chain]
++    if len(target_group) <= 1:
++        return struct_path
++
++    source = Path(struct_path)
++    merged_chain = target_group[0]
++    merged = source.with_name(f"{source.stem}_targetgroup_{merged_chain}{source.suffix}")
++    try:
++        text = source.read_text()
++    except Exception:
++        return struct_path
++
++    if source.suffix.lower() == ".pdb":
++        changed = False
++        lines = []
++        residue_numbers: Dict[Tuple[str, str, str, str], int] = {}
++        next_residue = 1
++        for line in text.splitlines(keepends=True):
++            if (line.startswith("ATOM") or line.startswith("HETATM")) and len(line) > 26 and line[21].strip() in target_group:
++                original_chain = line[21].strip()
++                original_resseq = line[22:26].strip()
++                original_icode = line[26:27]
++                residue_name = line[17:20]
++                residue_key = (original_chain, original_resseq, original_icode, residue_name)
++                if residue_key not in residue_numbers:
++                    residue_numbers[residue_key] = next_residue
++                    next_residue += 1
++                new_resseq = residue_numbers[residue_key]
++                line = f"{line[:21]}{merged_chain[:1]}{new_resseq:4d}{line[26:]}"
++                changed = True
++            elif (line.startswith("TER") or line.startswith("ANISOU")) and len(line) > 21 and line[21].strip() in target_group:
++                line = f"{line[:21]}{merged_chain[:1]}{line[22:]}"
++                changed = True
++            lines.append(line)
++        if changed:
++            merged.write_text("".join(lines))
++            return str(merged)
++        return struct_path
++
++    if source.suffix.lower() == ".cif":
++        atomsite_fields: Dict[str, int] = {}
++        field_index = 0
++        residue_numbers: Dict[Tuple[str, str, str], int] = {}
++        next_residue = 1
++        changed = False
++        out_lines = []
++        for line in text.splitlines(keepends=True):
++            stripped = line.strip()
++            if stripped.startswith("_atom_site."):
++                field = stripped.split(".", 1)[1]
++                atomsite_fields[field] = field_index
++                field_index += 1
++                out_lines.append(line)
++                continue
++            if stripped.startswith(("ATOM", "HETATM")) and atomsite_fields:
++                parts = stripped.split()
++                label_asym_idx = atomsite_fields.get("label_asym_id")
++                original_chain = parts[label_asym_idx] if label_asym_idx is not None and label_asym_idx < len(parts) else ""
++                if original_chain in target_group:
++                    label_seq_idx = atomsite_fields.get("label_seq_id")
++                    comp_idx = atomsite_fields.get("label_comp_id")
++                    original_seq = parts[label_seq_idx] if label_seq_idx is not None and label_seq_idx < len(parts) else ""
++                    original_comp = parts[comp_idx] if comp_idx is not None and comp_idx < len(parts) else ""
++                    residue_key = (original_chain, original_seq, original_comp)
++                    if residue_key not in residue_numbers:
++                        residue_numbers[residue_key] = next_residue
++                        next_residue += 1
++                    new_resseq = str(residue_numbers[residue_key])
++                    for seq_field in ("label_seq_id", "auth_seq_id"):
++                        seq_idx = atomsite_fields.get(seq_field)
++                        if seq_idx is not None and seq_idx < len(parts) and parts[seq_idx] != ".":
++                            parts[seq_idx] = new_resseq
++                            changed = True
++                for field_name in ("label_asym_id", "auth_asym_id"):
++                    idx = atomsite_fields.get(field_name)
++                    if idx is not None and idx < len(parts) and parts[idx] in target_group:
++                        parts[idx] = merged_chain
++                        changed = True
++                line_ending = "\n" if line.endswith("\n") else ""
++                out_lines.append(" ".join(parts) + line_ending)
++            else:
++                out_lines.append(line)
++        if changed:
++            merged.write_text("".join(out_lines))
++            return str(merged)
++    return struct_path
++
+ def get_ipsae_min_max(path: str, target_chain: str = 'A'):
+     """
+     Parse an ipsae_w_ipae.py TXT and aggregate metrics for the target_chain.
+@@ -197,8 +316,6 @@ def get_ipsae_min_max(path: str, target_chain: str = 'A'):
+     - Exclude zero-distance pairs (dist1==0 or dist2==0) for ipSAE-family, pDockQ, LIS.
+     - Compute ipae from Type==max rows WITHOUT distance gating so it remains cutoff-independent.
+     """
+-    if target_chain != 'A':
+-        raise ValueError("This function only supports target_chain='A'")
+     with open(path) as f:
+         lines = [l.strip() for l in f if l.strip() and not l.startswith('#')]
+     if not lines:
+@@ -375,19 +492,13 @@ def get_pDockQ_min_max(path, target_chain='A'):
+     if not lines:
+         return {"pDockQ": [None, None], "pDockQ2": [None, None]}
+     header = lines[0].split()
+-    idx = {col: header.index(col) for col in ('Chn1','Chn2','pDockQ','pDockQ2','dist1','dist2')}
++    idx = {col: header.index(col) for col in ('Chn1','Chn2','pDockQ','pDockQ2')}
+     partner_data = {}
+     for ln in lines[1:]:
+         parts = ln.split()
+         c1, c2 = parts[idx['Chn1']], parts[idx['Chn2']]
+         if target_chain not in (c1, c2):
+             continue
+-        try:
+-            d1 = float(parts[idx['dist1']]); d2 = float(parts[idx['dist2']])
+-        except ValueError:
+-            continue
+-        if d1 == 0 or d2 == 0:
+-            continue
+         partner = c2 if c1 == target_chain else c1
+         try:
+             pd1 = float(parts[idx['pDockQ']]); pd2 = float(parts[idx['pDockQ2']])
+@@ -437,27 +548,43 @@ def find_ipsae_txts(struct_path, bid):
+ # Processing one binder (sequential)
+ # -------------------------
+ 
+-def process_binder(bid: str, index, pae_cutoff: float, dist_cutoff: float, ipsae_script: str, overwrite: bool, verbose: bool):
++def process_binder(
++    bid: str,
++    binder_chain: str,
++    target_chains: List[str],
++    index,
++    pae_cutoff: float,
++    dist_cutoff: float,
++    ipsae_script: str,
++    overwrite: bool,
++    verbose: bool,
++):
+     results: Dict[str, float] = {}
+     notes: List[str] = []
+     valid, miss = locate_files(bid, index)
+     notes.extend(miss)
+     for _, src, struct, conf in valid:
++        scoring_struct = collapse_target_chains_for_group_scoring(struct, binder_chain, target_chains)
+         if verbose:
+-            print(f"  [{src}] struct={struct}")
++            print(f"  [{src}] struct={scoring_struct}")
+             print(f"  [{src}] conf  ={conf}")
+         try:
+-            calculate_ipsae(conf, struct, pae_cutoff, dist_cutoff, ipsae_script, overwrite, verbose)
++            calculate_ipsae(conf, scoring_struct, pae_cutoff, dist_cutoff, ipsae_script, overwrite, verbose)
+         except subprocess.CalledProcessError as e:
+             notes.append(f"[{bid}-{src}] IPSAE failed: {e}")
+             continue
+-        txts = find_ipsae_txts(struct, bid)
+-        if not txts:
+-            notes.append(f"[{bid}-{src}] No .txt found for {struct}")
++        txt = expected_txt_path(scoring_struct, pae_cutoff, dist_cutoff)
++        if not txt.exists():
++            txts = find_ipsae_txts(scoring_struct, bid)
++            txt = Path(txts[0]) if txts else txt
++        if not txt.exists():
++            notes.append(f"[{bid}-{src}] No .txt found for {scoring_struct}")
+             continue
+-        txt = txts[0]
+-        mn, mx, avg_ipsae_avg, avg_LIS, avg_min_ipsae, avg_ipSAE_d0chn, avg_ipSAE_d0dom, avg_ipae = get_ipsae_min_max(txt)
+-        pqq = get_pDockQ_min_max(txt)
++        mn, mx, avg_ipsae_avg, avg_LIS, avg_min_ipsae, avg_ipSAE_d0chn, avg_ipSAE_d0dom, avg_ipae = get_ipsae_min_max(
++            str(txt),
++            target_chain=binder_chain,
++        )
++        pqq = get_pDockQ_min_max(str(txt), target_chain=binder_chain)
+         pdockQ_mn, pdockQ_mx = pqq["pDockQ"][0], pqq["pDockQ"][1]
+         pdockQ2_mn, pdockQ2_mx = pqq["pDockQ2"][0], pqq["pDockQ2"][1]
+         prefix = 'boltz1' if src == 'boltz' else src
+@@ -474,7 +601,7 @@ def process_binder(bid: str, index, pae_cutoff: float, dist_cutoff: float, ipsae
+         results[f"{prefix}_ipSAE_d0dom"] = avg_ipSAE_d0dom
+         results[f"{prefix}_ipae"] = avg_ipae
+         if src == 'af3':
+-            rmin, rmax, count = min_max_pae_for_chain_contacts(conf, 0.60)
++            rmin, rmax, count = min_max_pae_for_chain_contacts(conf, 0.60, target_chain=binder_chain)
+             results[f"{prefix}_min_pae_contact"] = rmin
+             results[f"{prefix}_max_pae_contact"] = rmax
+             results[f"{prefix}_res_above_contact_thres"] = count
+@@ -492,7 +619,14 @@ def main():
+     run_df = pd.read_csv(run_csv_path, dtype=str)
+     if 'binder_id' not in run_df.columns:
+         raise SystemExit("--run-csv must contain a 'binder_id' column")
+-    binder_ids = [str(x).strip() for x in run_df['binder_id'].tolist() if str(x).strip()]
++    binder_rows = []
++    for _, row in run_df.iterrows():
++        binder_id = str(row.get('binder_id') or '').strip()
++        if not binder_id:
++            continue
++        binder_chain = str(row.get('binder_chain') or 'A').strip() or 'A'
++        target_chains = parse_chain_list(row.get('target_chains'))
++        binder_rows.append((binder_id, binder_chain, target_chains))
+ 
+     # Determine sources: explicit or inferred from provided dirs
+     sources: List[str] = args.sources if args.sources else []
+@@ -521,8 +655,20 @@ def main():
+     all_notes: List[str] = []
+ 
+     tasks = []
+-    for bid in binder_ids:
+-        tasks.append((bid, index, args.pae_cutoff, args.dist_cutoff, args.ipsae_script_path, args.overwrite_ipsae, args.verbose))
++    for bid, binder_chain, target_chains in binder_rows:
++        tasks.append(
++            (
++                bid,
++                binder_chain,
++                target_chains,
++                index,
++                args.pae_cutoff,
++                args.dist_cutoff,
++                args.ipsae_script_path,
++                args.overwrite_ipsae,
++                args.verbose,
++            )
++        )
+ 
+     with ProcessPoolExecutor(max_workers=args.max_workers) as pool:
+         futures = {pool.submit(process_binder, *t): t[0] for t in tasks}

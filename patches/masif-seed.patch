@@ -1,0 +1,75 @@
+diff --git a/masif/source/data_preparation/00-pdb_download.py b/masif/source/data_preparation/00-pdb_download.py
+index 410df02..a238068 100755
+--- a/masif/source/data_preparation/00-pdb_download.py
++++ b/masif/source/data_preparation/00-pdb_download.py
+@@ -1,35 +1,53 @@
+ #!/usr/bin/python
+-import Bio
+-from Bio.PDB import * 
+ import sys
+-import importlib
+ import os
++import requests
+ 
+ from default_config.masif_opts import masif_opts
+ # Local includes
+ from input_output.protonate import protonate
+ 
+-if len(sys.argv) <= 1: 
+-    print("Usage: "+sys.argv[0]+" PDBID_A_B")
++if len(sys.argv) <= 1:
++    print("Usage: " + sys.argv[0] + " PDBID_A_B")
+     print("A or B are the chains to include in this pdb.")
+     sys.exit(1)
+ 
+-if not os.path.exists(masif_opts['raw_pdb_dir']):
+-    os.makedirs(masif_opts['raw_pdb_dir'])
+-
+-if not os.path.exists(masif_opts['tmp_dir']):
+-    os.mkdir(masif_opts['tmp_dir'])
++# Ensure directories exist
++os.makedirs(masif_opts['raw_pdb_dir'], exist_ok=True)
++os.makedirs(masif_opts['tmp_dir'], exist_ok=True)
+ 
+ in_fields = sys.argv[1].split('_')
+-pdb_id = in_fields[0]
++pdb_id = in_fields[0].upper()   # RCSB prefers uppercase IDs
++
++# -------------------------
++# Download PDB via HTTPS
++# -------------------------
++url = f"https://files.rcsb.org/download/{pdb_id}.pdb"
++pdb_filename = os.path.join(masif_opts['tmp_dir'], f"{pdb_id}.pdb")
++
++print(f"Downloading {pdb_id} from RCSB...")
++
++try:
++    response = requests.get(url, timeout=60)
++    response.raise_for_status()
++
++    with open(pdb_filename, "wb") as f:
++        f.write(response.content)
+ 
+-# Download pdb 
+-pdbl = PDBList(server='http://ftp.wwpdb.org')
+-pdb_filename = pdbl.retrieve_pdb_file(pdb_id, pdir=masif_opts['tmp_dir'],file_format='pdb')
++    print(f"Downloaded {pdb_filename}")
+ 
+-##### Protonate with reduce, if hydrogens included.
+-# - Always protonate as this is useful for charges. If necessary ignore hydrogens later.
+-protonated_file = masif_opts['raw_pdb_dir']+"/"+pdb_id+".pdb"
++except requests.exceptions.RequestException as e:
++    print(f"Error downloading PDB {pdb_id}: {e}")
++    sys.exit(1)
++
++# -------------------------
++# Protonate with Reduce
++# -------------------------
++protonated_file = os.path.join(masif_opts['raw_pdb_dir'], f"{pdb_id}.pdb")
++
++print("Running protonation...")
+ protonate(pdb_filename, protonated_file)
++
+ pdb_filename = protonated_file
++print(f"Protonated file saved to {pdb_filename}")
+ 

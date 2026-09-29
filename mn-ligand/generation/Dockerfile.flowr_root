@@ -1,6 +1,6 @@
 FROM mn-biohub-esm:cu128
 
-ARG SOURCE_COMMIT
+ARG SOURCE_COMMIT=b2263e2516ad798d0119f8c4b531698860cc846e
 
 LABEL org.opencontainers.image.title="mn-ligand FLOWR.root generation engine" \
       org.opencontainers.image.description="FLOWR.root CUDA 12.8 runtime for Ada and Blackwell GPUs" \
@@ -26,8 +26,10 @@ RUN python -m pip install --no-cache-dir \
       MDAnalysis openbabel-wheel pdbinf prolif pymol-open-source rmsd \
       tensordict torch-ema torch-geometric==2.7.0 torchmetrics tqdm
 
-COPY tools_to_implement/flowr_root/ /opt/engine/
-COPY containers/generation/runner.py /opt/mn-ligand/generation_runner.py
+COPY scripts/fetch-pinned-source.sh /usr/local/bin/mn-fetch-source
+RUN chmod +x /usr/local/bin/mn-fetch-source \
+    && mn-fetch-source https://github.com/jule-c/flowr_root.git "${SOURCE_COMMIT}" /opt/engine
+COPY --from=app /containers/generation/runner.py /opt/mn-ligand/generation_runner.py
 
 ENTRYPOINT ["python", "/opt/mn-ligand/generation_runner.py"]
 CMD ["--help"]
