@@ -1,0 +1,106 @@
+{
+  "run_date": "2026-10-01",
+  "purpose": "Implement and validate the Protenix off, fast, and big mode paths",
+  "images": {
+    "stock": {
+      "tag": "mn-protenix:cu128",
+      "id": "sha256:67b9b1f4f6a8c07b8a5a1d1061ec1faa85b999bd22bd24d77dd005a0b9558fc6"
+    },
+    "candidate": {
+      "tag": "mn-protenix-opt:2.0.0-cu128",
+      "id": "sha256:947bc264d3ac0ce793ae706c56067b53f963bdad8b3d7962889fe96a1a2c3153"
+    }
+  },
+  "software": {
+    "protenix_version": "2.0.0",
+    "protenix_commit": "c3bfc365b3e1341a11935eddfe7bfdc308092147",
+    "python": "3.11",
+    "torch": "2.7.1+cu128",
+    "triton": "3.3.1",
+    "cuequivariance": "0.10.0",
+    "cuequivariance_torch": "0.8.0",
+    "optimizer_kit_commit": "f4f62fa6592ae4938d49b1757bea0cfeff9f468e"
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "gpu_memory_mib": 24564,
+    "compute_capability": "8.9",
+    "host_gpu_count": 2
+  },
+  "selectable_modes": ["off", "fast", "big"],
+  "rtx_4090_ablations": [
+    "blk2_block_path",
+    "blk2_chunked_k2b",
+    "k2b_flash_triattention",
+    "fastln_prebuilt"
+  ],
+  "cache": {
+    "volume": "mn-protenix-opt-jit",
+    "mount_path": "/opt/protenix-jit",
+    "stream_layernorm_first_run_compiles": true,
+    "repeat_run_ninja_no_work": true
+  },
+  "results": {
+    "off": {
+      "candidate_cli_help_exit_code": 0,
+      "implementation": "stock Protenix CLI passthrough"
+    },
+    "fast_packaged_smoke": {
+      "tokens": 76,
+      "cycle": 1,
+      "step": 2,
+      "sample": 1,
+      "model_forward_seconds": 3.62,
+      "cif_written": true,
+      "final_partial": false
+    },
+    "fast_packaged_p199": {
+      "input": "1BRS barnase:barstar",
+      "tokens": 199,
+      "sample": 1,
+      "msa": "query-only",
+      "first_model_forward_seconds": 8.58,
+      "repeat_model_forward_seconds": 4.96,
+      "repeat_wall_seconds": 22.89,
+      "first_run_compiled_stream_layernorm": true,
+      "repeat_run_reused_extension": true,
+      "final_partial": false,
+      "cif_and_confidence_json_parsed": true,
+      "timing_note": "Cold and warm setup differ; not a controlled speed comparison."
+    },
+    "big_long_target": {
+      "input": "LCT P09848",
+      "residues": 1927,
+      "cycle": 10,
+      "step": 200,
+      "sample": 1,
+      "dtype": "bf16",
+      "use_msa": false,
+      "gpu_count": 1,
+      "model_forward_seconds": 817.09,
+      "wall_seconds": 976,
+      "peak_sampled_gpu_memory_mib": 23230,
+      "cif_written": true,
+      "parsed_residue_count": 1927,
+      "confidence_json_parsed": true,
+      "final_partial": false,
+      "fallbacks": "none",
+      "invocation": "Kit protenix_opt CLI with big configuration; not through candidate image entrypoint."
+    },
+    "big_two_gpu_preflight": {
+      "exit_code": 0,
+      "gpu_count": 2,
+      "sharding": "rowpair",
+      "unit_files": 24,
+      "nccl": "2.26.2",
+      "full_prediction_run": false
+    }
+  },
+  "raw_results_directory": "/mnt/data/RESULTS/protenix-optimization-20261001/",
+  "limits": [
+    "No controlled stock-versus-optimized speed comparison was completed.",
+    "No structural quality or numerical equivalence comparison was completed.",
+    "No actual two-GPU prediction was completed.",
+    "Some sm_89 transition and TriMul provider rows are inherited from sm_80 measurements."
+  ]
+}

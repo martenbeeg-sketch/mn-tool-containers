@@ -11,6 +11,9 @@ images:
   genie3: {canonical: "mn-genie3:cu128", app: mn-protein-design, recipe: protein-design/genie3/Dockerfile, legacy: ["mnprot-genie3-cu128:latest"]}
   pxdesign: {canonical: "mn-pxdesign:cu128", app: mn-protein-design, recipe: protein-design/pxdesign/Dockerfile, legacy: ["mnprot-pxdesign-cu128:latest"]}
   protenix: {canonical: "mn-protenix:cu128", app: mn-protein-design, recipe: protein-design/protenix/Dockerfile, legacy: ["mnprot-protenix-cu128:latest"]}
+  protenix-opt: {canonical: "mn-protenix-opt:2.0.0-cu128", app: mn-protein-design, recipe: protein-design/protenix-opt/Dockerfile, base: "mn-protenix:cu128", legacy: []}
+  # Built from the pinned RF3 kit's own Dockerfile with `./build.sh rf3-opt`.
+  rf3-opt: {canonical: "mn-rf3-opt:0.2.1-dev13-cu130", app: mn-protein-design, recipe: external, base: "RoseTTAFold3 optimization kit / Foundry 0.2.1.dev13", legacy: []}
   proteina-complexa: {canonical: "mn-proteina-complexa:5ae24b0", app: mn-protein-design, recipe: protein-design/proteina-complexa/Dockerfile, legacy: ["ovoex-proteina-complexa:latest"]}
   boltzgen: {canonical: "mn-boltzgen:latest", app: mn-protein-design, recipe: protein-design/boltzgen/Dockerfile, legacy: ["boltzgen:latest"]}
   scoring-python: {canonical: "mn-protein-scoring-python:latest", app: mn-protein-design, recipe: protein-design/de-novo-binder-scoring/Dockerfile, base: "mn-python-structure:latest"}
@@ -19,10 +22,19 @@ images:
   protpardelle-1c: {canonical: "mn-protpardelle-1c:cu128", app: mn-protein-design, recipe: protein-design/protpardelle-1c/Dockerfile, legacy: ["mnprot-protpardelle-1c-cu128:latest"]}
   biohub-esm: {canonical: "mn-biohub-esm:3.4.1-cu128", app: mn-protein-design, recipe: shared/biohub-esm/Dockerfile, legacy: []}
   colabfold: {canonical: "mn-colabfold:1.6.1-cu12", app: mn-protein-design, recipe: protein-design/colabfold/Dockerfile, legacy: ["mnprot-colabfold-cuda12:1.6.1"]}
+  colabfold-opt: {canonical: "mn-colabfold-opt:1.6.1-jax0.5.3-cu124", app: mn-protein-design, recipe: protein-design/colabfold-opt/Dockerfile, base: "ColabFold optimization kit / pinned JAX 0.5.3", legacy: []}
+  af2ig-opt: {canonical: "mn-af2ig-opt:cafa3853-jax0.5.3-cu124", app: mn-protein-design, recipe: external, base: "AF2-IG optimization kit / dl_binder_design cafa3853 / pinned JAX 0.5.3", legacy: []}
+  cofolding-af3: {canonical: "mn-cofolding-af3:3.1.14-cu13", app: mn-cofolding, recipe: protein-design/cofolding-af3/Dockerfile, legacy: []}
+  # One active optimized AF3 recipe; superseded candidates live under
+  # protein-design/cofolding-af3/archive/ and are intentionally not cataloged.
+  cofolding-af3-memory: {canonical: "mn-cofolding-af3-memory:3.1.14-cu13", app: mn-cofolding, recipe: protein-design/cofolding-af3/optimized/Dockerfile, base: "mn-cofolding-af3:3.1.14-cu13", legacy: []}
+  esmfold2-opt: {canonical: "mn-esmfold2-opt:0.1.0-cu130", app: mn-cofolding, recipe: protein-design/esmfold2-opt/Dockerfile, base: "ESMFold2 optimization kit / pinned ESM 3.3.0 + CUDA 13.0; RTX 4090 and RTX 5090 arch targets", legacy: []}
+  chai1-opt: {canonical: "mn-chai1-opt:0.6.1-cu130", app: mn-cofolding, recipe: protein-design/chai1-opt/Dockerfile, base: "Chai-1 optimization kit 0.6.1 / pinned PyTorch 2.13 + CUDA 13.0; RTX 4090 and RTX 5090 configs", legacy: []}
   openfold3: {canonical: "mn-openfold3:cu13", app: mn-protein-design, recipe: protein-design/openfold3/Dockerfile, legacy: ["mnprot-openfold3-cu13:latest"]}
   bindcraft2: {canonical: "mn-bindcraft2:4a56313-cu13", app: mn-protein-design, recipe: protein-design/bindcraft2/Dockerfile, legacy: ["mnprot-bindcraft2:4a56313"]}
   alphafast: {canonical: "mn-alphafast:cu128", app: shared, recipe: shared/alphafast/Dockerfile, legacy: ["alphafast:latest"]}
   boltz2: {canonical: "mn-boltz2:cu128", app: shared, recipe: shared/boltz2/Dockerfile, legacy: ["ovoex-boltz2:latest"]}
+  boltz2-opt: {canonical: "mn-boltz2-opt:2.2.1-cu130", app: shared, recipe: shared/boltz2/optimized/Dockerfile, base: "Boltz-2 optimization kit 2.2.1", legacy: []}
   ligandmpnn: {canonical: "mn-ligandmpnn:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-ligandmpnn:latest"]}
   foundry: {canonical: "mn-foundry:cu128", app: mn-protein-design, recipe: external, legacy: ["ovoex-foundry-cu128:latest"]}
   bindcraft: {canonical: "mn-bindcraft:latest", app: mn-protein-design, recipe: external, legacy: ["ovo-bindcraft:latest"]}

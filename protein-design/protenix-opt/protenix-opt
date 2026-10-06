@@ -1,0 +1,8 @@
+#!/bin/sh
+# PROTENIX_OPT_MODE belongs to this image's selector. Remove it before Python
+# starts because the kit reserves PROTENIX_OPT* for its own declared settings.
+export MN_PROTENIX_OPT_MODE="${PROTENIX_OPT_MODE:-off}"
+export MN_PROTENIX_OPT_N_GPU="${PROTENIX_OPT_N_GPU:-1}"
+unset PROTENIX_OPT_MODE
+unset PROTENIX_OPT_N_GPU
+exec python /usr/local/libexec/mn-protenix-opt.py "$@"

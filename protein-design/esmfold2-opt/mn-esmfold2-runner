@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HF_HOME="${HF_HOME:-/cache/huggingface/esmfold2}"
+export HF_HOME
+
+link_snapshot() {
+  local repo="$1" source="$2" revision="$3"
+  local model_dir="$HF_HOME/hub/models--biohub--$repo"
+  local snapshots="$model_dir/snapshots"
+  local snapshot="$snapshots/$revision"
+  if [[ ! -d "$source" ]]; then
+    printf 'ESMFold2 reference weights are missing: %s\n' "$source" >&2
+    exit 3
+  fi
+  mkdir -p "$snapshots" "$model_dir/refs"
+  if [[ ! -e "$snapshot" ]]; then
+    ln -s "$source" "$snapshot"
+  fi
+  # Hugging Face Hub reads refs/main as an exact commit string; a trailing newline
+  # becomes part of the snapshot path on offline cache lookups.
+  printf '%s' "$revision" > "$model_dir/refs/main"
+}
+
+link_snapshot ESMFold2 /reference/biohub-esm/ESMFold2 1ebf0e3481a5184eb6171d40615c79e384b48796
+link_snapshot ESMC-6B /reference/biohub-esm/ESMC-6B 45b0fa5d7fb06faefbd5e3b89bdcef35d564e79a
+mkdir -p "${MODEL_OPT_JIT_ROOT:-/cache/esmfold2/jit}"
+
+exec bash /kit/esmfold2/run.sh "$@"

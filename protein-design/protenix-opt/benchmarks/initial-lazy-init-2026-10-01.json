@@ -1,0 +1,116 @@
+{
+  "run_date": "2026-10-01",
+  "purpose": "Historical lazy-init speed and correctness trial before the off/fast/big mode integration",
+  "images": {
+    "stock": {
+      "tag": "mn-protenix:cu128",
+      "id": "sha256:67b9b1f4f6a8c07b8a5a1d1061ec1faa85b999bd22bd24d77dd005a0b9558fc6"
+    },
+    "candidate": {
+      "tag": "mn-protenix-opt:2.0.0-cu128",
+      "id": "sha256:35407e895fe1c20ed019e98291e280db46f87cb25e7aae1b4b0efc60d4719650",
+      "historical_mode_label": "exact (retired prototype label; not selectable in the current image)",
+      "active_lever": "ptx_lazy_init"
+    }
+  },
+  "software": {
+    "protenix_version": "2.0.0",
+    "protenix_commit": "c3bfc365b3e1341a11935eddfe7bfdc308092147",
+    "python": "3.11",
+    "torch": "2.7.1+cu128",
+    "triton": "3.3.1",
+    "cuequivariance": "0.10.0",
+    "cuequivariance_torch": "0.8.0",
+    "optimizer_kit": "tools-to-implement/uplifting-biomolecular-modeling/protenix_v2",
+    "optimizer_kit_commit": "2475421477ab414b571149ad4a875c390ff8a35d",
+    "optimizer_license": "Apache-2.0"
+  },
+  "hardware": {
+    "gpu": "NVIDIA GeForce RTX 4090",
+    "gpu_index": 0,
+    "gpu_memory_mib": 24564,
+    "driver": "595.91.07",
+    "compute_capability": "8.9",
+    "host_has_two_gpus": true,
+    "topology": "PCIe, same NUMA node, no NVLink"
+  },
+  "weights": {
+    "host_path": "/mnt/db/reference_files/protenix/checkpoint/protenix-v2.pt",
+    "container_path": "/ref/protenix/checkpoint/protenix-v2.pt",
+    "baked_into_image": false
+  },
+  "input": {
+    "name": "1BRS_barnase_barstar_1to1",
+    "source": "tools-to-implement/uplifting-biomolecular-modeling/protenix_v2/opt/forward/flashpairformer/public_inputs/p199.json",
+    "prediction_json_sha256": "55d5d48f7dbf56542d7b066ed1c106a47d784deadb9cb2fa166d0e6218cb7206",
+    "total_residues": 199,
+    "chain_lengths": [110, 89],
+    "msa": "one query row per chain; query rows match input sequences",
+    "msa_sha256": {
+      "barnase_non_pairing_and_pairing": "cc1d1fd074efcab8e34365cbde4f5b8f6d062afe9d9103b4c43e3ab004203d06",
+      "barstar_non_pairing_and_pairing": "617cbf5a282e31308b99c0bfd1ebdb61760ff113d75b8e0afd821e8b1e091e7f"
+    }
+  },
+  "settings": {
+    "command": "protenix pred --input /work/input.json --out_dir /work/out --seeds 101 --model_name protenix-v2 --cycle 10 --step 200 --sample 5 --dtype bf16 --use_msa True --use_template False --use_default_params True --need_atom_confidence True",
+    "seed": 101,
+    "cycle": 10,
+    "step": 200,
+    "sample": 5,
+    "dtype": "bf16",
+    "use_msa": true,
+    "use_template": false,
+    "use_default_params": true,
+    "need_atom_confidence": true
+  },
+  "results": {
+    "stock_or_off_wall_seconds": [92.57, 89.93, 94.54],
+    "stock_or_off_model_forward_seconds": [15.04, 14.09, 13.99],
+    "stock_or_off_median_wall_seconds": 92.57,
+    "exact_candidate_wall_seconds": [28.08, 27.34, 27.06],
+    "exact_candidate_model_forward_seconds": [14.44, 14.22, 14.33],
+    "exact_candidate_median_wall_seconds": 27.34,
+    "median_wall_reduction_percent": 70.5,
+    "candidate_off": {
+      "exit_code": 0,
+      "active_mode_log": "mode=off implementation=stock",
+      "parsed_cif_count": 5,
+      "parsed_summary_confidence_json_count": 5
+    },
+    "candidate_lazy_init": {
+      "exit_codes": [0, 0, 0],
+      "active_mode_log": "mode=exact lever=lazy_init",
+      "parsed_cif_count_per_run": 5,
+      "parsed_summary_confidence_json_count_per_run": 5
+    },
+    "strict_lazy_init_recheck": {
+      "stock_model_construction_seconds": 96.51,
+      "lazy_model_construction_seconds": 0.48,
+      "identical_parameter_and_buffer_count": 4174,
+      "strict_checkpoint_load": true
+    },
+    "deterministic_comparison": {
+      "stock_wall_seconds": 95.33,
+      "stock_model_forward_seconds": 20.14,
+      "candidate_wall_seconds": 33.37,
+      "candidate_model_forward_seconds": 20.62,
+      "byte_identical_cif_count": 5,
+      "equal_summary_confidence_json_count": 5,
+      "environment": "CUBLAS_WORKSPACE_CONFIG=:4096:8; torch deterministic algorithms enabled warn_only; optimizer-kit deterministic scatter implementation injected in both arms"
+    },
+    "nvml_peak_memory_mib_from_instrumented_runs": {
+      "stock_default": 4512,
+      "lazy_default": 4512,
+      "stock_deterministic": 4258,
+      "lazy_deterministic": 4574
+    }
+  },
+  "raw_results_directory": "/mnt/data/RESULTS/protenix-optimization-20261001/",
+  "notes": [
+    "The lazy-init lever skips random parameter initialization; strict checkpoint loading replaces all parameters.",
+    "The measured gain is CPU-side startup time. Model-forward time and GPU memory did not improve in these short-run measurements.",
+    "Default same-seed stock runs were nondeterministic; the deterministic comparison is the exactness evidence.",
+    "No medium/long capacity sweep, MSA-heavy workload, multi-GPU run, or 5090 run is included.",
+    "This is a historical single-lever experiment. The current selectable image modes are off, fast, and big."
+  ]
+}
