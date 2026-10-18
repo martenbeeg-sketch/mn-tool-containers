@@ -14,6 +14,7 @@ images:
   protenix-opt: {canonical: "mn-protenix-opt:2.0.0-cu128", app: mn-protein-design, recipe: protein-design/protenix-opt/Dockerfile, base: "mn-protenix:cu128", legacy: []}
   # Built from the pinned RF3 kit's own Dockerfile with `./build.sh rf3-opt`.
   rf3-opt: {canonical: "mn-rf3-opt:0.2.1-dev13-cu130", app: mn-protein-design, recipe: external, base: "RoseTTAFold3 optimization kit / Foundry 0.2.1.dev13", legacy: []}
+  rfantibody: {canonical: "mn-rfantibody:3e5a5bb-cu118-v1", app: mn-molecular-design-studio, recipe: protein-design/rfantibody/Dockerfile, base: "RFantibody 3e5a5bb / CUDA 11.8", legacy: []}
   proteina-complexa: {canonical: "mn-proteina-complexa:5ae24b0", app: mn-protein-design, recipe: protein-design/proteina-complexa/Dockerfile, legacy: ["ovoex-proteina-complexa:latest"]}
   boltzgen: {canonical: "mn-boltzgen:latest", app: mn-protein-design, recipe: protein-design/boltzgen/Dockerfile, legacy: ["boltzgen:latest"]}
   scoring-python: {canonical: "mn-protein-scoring-python:latest", app: mn-protein-design, recipe: protein-design/de-novo-binder-scoring/Dockerfile, base: "mn-python-structure:latest"}

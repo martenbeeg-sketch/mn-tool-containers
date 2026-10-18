@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECTS="$(cd "$ROOT/.." && pwd)"
 PROTEIN_REPO="$PROJECTS/mn-protein-design"
 LIGAND_REPO="$PROJECTS/ovo-ligand"
+RFANTIBODY_TOOLS="$PROJECTS/tools-to-implement/RFantibody"
 AF3_OPT_TOOLS="$PROJECTS/tools-to-implement/uplifting-biomolecular-modeling"
 BOLTZ2_OPT_TOOLS="$PROJECTS/tools-to-implement/uplifting-biomolecular-modeling"
 PROTENIX_OPT_TOOLS="$PROJECTS/tools-to-implement/uplifting-biomolecular-modeling"
@@ -15,7 +16,7 @@ ESMFOLD2_OPT_TOOLS="$PROJECTS/tools-to-implement/uplifting-biomolecular-modeling
 CHAI1_OPT_TOOLS="$PROJECTS/tools-to-implement/uplifting-biomolecular-modeling"
 
 usage() {
-  printf 'Usage: %s {mn-protein-design|mn-ligand|mn-cofolding|boltz2-opt|rf3-opt|colabfold-opt|af2ig-opt|esmfold2-opt|chai1-opt}\n' "$0" >&2
+  printf 'Usage: %s {mn-protein-design|mn-ligand|mn-cofolding|boltz2-opt|rf3-opt|colabfold-opt|af2ig-opt|esmfold2-opt|chai1-opt|rfantibody}\n' "$0" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -55,6 +56,28 @@ build_biohub_esm() {
     return
   fi
   compose "$PROTEIN_REPO" biohub-esm
+}
+
+build_rfantibody() {
+  local source_dir="${RFANTIBODY_SOURCE_DIR:-$RFANTIBODY_TOOLS}"
+  local build_context
+  build_context="$(mktemp -d)"
+  trap 'rm -rf "$build_context"' EXIT
+  if [[ -f "$source_dir/pyproject.toml" && -f "$source_dir/uv.lock" ]]; then
+    tar -C "$source_dir" --exclude=.git -cf - . | tar -C "$build_context" -xf -
+  else
+    source_dir="$build_context/source"
+    bash "$ROOT/scripts/fetch-pinned-source.sh" \
+      https://github.com/RosettaCommons/RFantibody.git \
+      3e5a5bb1cb98befde9fc049ae3ff58cabb491f67 "$source_dir"
+    cp -a "$source_dir/." "$build_context/"
+    rm -rf "$source_dir"
+  fi
+  cp "$ROOT/protein-design/rfantibody/Dockerfile" "$build_context/Dockerfile"
+  docker buildx build --load \
+    -t mn-rfantibody:3e5a5bb-cu118-v1 \
+    -f "$build_context/Dockerfile" \
+    "$build_context"
 }
 
 case "$APP" in
@@ -277,6 +300,9 @@ case "$APP" in
       fi
       compose "$LIGAND_REPO" alphafast
     fi
+    ;;
+  rfantibody)
+    build_rfantibody
     ;;
   *)
     usage
