@@ -60,24 +60,23 @@ build_biohub_esm() {
 
 build_rfantibody() {
   local source_dir="${RFANTIBODY_SOURCE_DIR:-$RFANTIBODY_TOOLS}"
-  local build_context
-  build_context="$(mktemp -d)"
-  trap 'rm -rf "$build_context"' EXIT
+  MN_RFAB_BUILD_CONTEXT="$(mktemp -d)"
+  trap 'rm -rf "${MN_RFAB_BUILD_CONTEXT:-}"' EXIT
   if [[ -f "$source_dir/pyproject.toml" && -f "$source_dir/uv.lock" ]]; then
-    tar -C "$source_dir" --exclude=.git -cf - . | tar -C "$build_context" -xf -
+    tar -C "$source_dir" --exclude=.git -cf - . | tar -C "$MN_RFAB_BUILD_CONTEXT" -xf -
   else
-    source_dir="$build_context/source"
+    source_dir="$MN_RFAB_BUILD_CONTEXT/source"
     bash "$ROOT/scripts/fetch-pinned-source.sh" \
       https://github.com/RosettaCommons/RFantibody.git \
       3e5a5bb1cb98befde9fc049ae3ff58cabb491f67 "$source_dir"
-    cp -a "$source_dir/." "$build_context/"
+    cp -a "$source_dir/." "$MN_RFAB_BUILD_CONTEXT/"
     rm -rf "$source_dir"
   fi
-  cp "$ROOT/protein-design/rfantibody/Dockerfile" "$build_context/Dockerfile"
+  cp "$ROOT/protein-design/rfantibody/Dockerfile" "$MN_RFAB_BUILD_CONTEXT/Dockerfile"
   docker buildx build --load \
     -t mn-rfantibody:3e5a5bb-cu118-v1 \
-    -f "$build_context/Dockerfile" \
-    "$build_context"
+    -f "$MN_RFAB_BUILD_CONTEXT/Dockerfile" \
+    "$MN_RFAB_BUILD_CONTEXT"
 }
 
 case "$APP" in
