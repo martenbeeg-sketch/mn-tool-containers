@@ -40,7 +40,10 @@ RUN if [ "${INSTALL_COLABFOLD}" = "true" ]; then \
             "python=3.10" \
             -y; \
     fi \
-    && conda clean -a -y
+    && conda clean -a -y \
+    && python -m pip install --no-cache-dir \
+        --extra-index-url https://download.pytorch.org/whl/cu128 \
+        "torch==2.7.1+cu128" "torchvision==0.22.1+cu128" "torchaudio==2.7.1+cu128"
 
 RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel "numpy>=2.0.2,<3" Cython \
     && python -m pip install --no-cache-dir --no-build-isolation -e . \
@@ -94,12 +97,20 @@ RUN conda install -c conda-forge -c bioconda dssp -y \
     && ln -sf /opt/conda/bin/mkdssp /opt/genie3/packages/dssp-2.3.0/mkdssp \
     && conda clean -a -y
 
+# ColabFold's dependency resolution may pull a CUDA 12.6 Torch wheel into the
+# base environment. Restore the explicit CUDA 12.8 build after all Python
+# installs so the final default environment supports both sm_89 and sm_120.
+RUN python -m pip install --no-cache-dir --force-reinstall --no-deps \
+      --extra-index-url https://download.pytorch.org/whl/cu128 \
+      "torch==2.7.1+cu128" "torchvision==0.22.1+cu128" "torchaudio==2.7.1+cu128"
+
 COPY --from=app /containers/genie3/entrypoint.sh /usr/local/bin/genie3-entrypoint
 
 ENV PYTHONPATH=/opt/genie3/src:/opt/genie3/packages/ProteinMPNN:/opt/genie3/packages/IPSAE \
     XDG_CACHE_HOME=/cache/xdg-cache \
     GENIE3_COLABFOLD_DATA_DIR=/cache/xdg-cache/colabfold \
     BOLTZ_CACHE=/cache \
+    TORCH_CUDA_ARCH_LIST="8.9;12.0+PTX" \
     PATH=/opt/genie3/packages/TMscore:$PATH \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility

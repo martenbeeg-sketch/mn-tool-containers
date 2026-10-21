@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+set -e
+
+# Protenix V2's base image defines PROTENIX_OPT_MODE, but its optimizer
+# bootstrap rejects that variable before Python starts. The normalized API
+# selects the mode from the manifest and passes it to the native CLI adapter.
+unset PROTENIX_OPT_MODE
+if [[ -f /opt/activate.sh ]]; then
+  source /opt/activate.sh
+fi
+if command -v python3 >/dev/null 2>&1; then
+  python=python3
+elif command -v python >/dev/null 2>&1; then
+  python=python
+else
+  printf 'mn-predict: no Python interpreter is available in the image environment\n' >&2
+  exit 2
+fi
+exec "$python" -m mn_batch_api.entrypoint "$@"

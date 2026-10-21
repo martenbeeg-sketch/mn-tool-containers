@@ -243,6 +243,15 @@ completes. Do not infer quality from a mode name.
   mode, active levers, and output location with the benchmark. Record the
   profile's validation status separately from the image tag.
 
+For complexes, record the MSA source and mode, pair strategy, paired and
+unpaired rows available, rows in the prepared input, and rows actually passed
+after engine-specific caps. A shared MSA cache does not mean engines consume the
+same format: one may read AF3 JSON fields, a multimer A3M, per-chain files, CSV
+key columns, or aligned parquet. When paired homolog rows are disabled, keep the
+query row paired and distinguish server-aligned row keys from biological
+taxonomy IDs. The current MN Cofolding adapters and 17-entry FoldBench route
+matrix are documented in the [paired-MSA route matrix](../mn-cofolding/docs/PAIRED_MSA.md).
+
 ## Lessons from the local Boltz2 and AF3 work
 
 ### Boltz2

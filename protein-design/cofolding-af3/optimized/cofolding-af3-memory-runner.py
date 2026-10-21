@@ -75,8 +75,8 @@ def main() -> None:
     model_name = _argument_value(arguments, "--model", "")
     if n_gpu not in (1, 2):
         raise SystemExit(f"MN_COFOLDING_AF3_N_GPU must be 1 or 2, got {n_gpu}")
-    if n_gpu > 1 and (mode != "big" or model_name != "alphafold3"):
-        raise SystemExit("AF3 two-GPU row sharding is restricted to big mode with official alphafold3 weights")
+    if n_gpu > 1 and (mode != "big" or model_name not in {"alphafold3", "openfold3"}):
+        raise SystemExit("AF3-JAX two-GPU row sharding is restricted to big mode with AF3 or OF3-P2 weights")
     if mode == "big":
         # A larger contiguous BFC pool avoids the fragmentation observed when
         # dynamic allocation was used for the 1,927-aa result materialization.
@@ -147,7 +147,7 @@ def _argument_value(arguments: list[str], name: str, default: str) -> str:
 
 
 def _run_rowpair_two_gpu(helpers: dict, arguments: list[str], *, n_gpu: int) -> None:
-    """Install the kit's row-sharded trunk recipe on the official 3.1.14 source.
+    """Install the kit's row-sharded trunk recipe on the pinned AF3-JAX source.
 
     The 3.1.14 image adds model-family branches and split diffusion conditioning
     that are outside the kit's 3.1.4 head transcription. This port pins the
@@ -156,8 +156,9 @@ def _run_rowpair_two_gpu(helpers: dict, arguments: list[str], *, n_gpu: int) -> 
     """
     if n_gpu != 2:
         raise RuntimeError(f"rowpair port currently supports exactly 2 GPUs, got {n_gpu}")
-    if _argument_value(arguments, "--model", "") != "alphafold3":
-        raise RuntimeError("rowpair port is source-reviewed for official alphafold3 weights only")
+    model_name = _argument_value(arguments, "--model", "")
+    if model_name not in {"alphafold3", "openfold3"}:
+        raise RuntimeError("rowpair port supports only official AF3 or AF3-JAX with OF3-P2 weights")
     if any(
         arg == "--jax_backend=cpu"
         or (arg == "--jax_backend" and index + 1 < len(arguments) and arguments[index + 1] == "cpu")
@@ -173,7 +174,7 @@ def _run_rowpair_two_gpu(helpers: dict, arguments: list[str], *, n_gpu: int) -> 
     source_install = recipe.install
     recipe.PIN = {
         **recipe.PIN,
-        "tree": "official AlphaFold 3 3.1.14 image; reviewed trunk port",
+        "tree": "AF3-JAX 3.1.14 image; reviewed trunk port for AF3 and OF3-P2 weights",
         "image": "mn-cofolding-af3-memory:3.1.14-cu13",
         "files": AF3_3_1_14_ROWPAIR_PIN,
     }
@@ -266,7 +267,7 @@ def _run_rowpair_two_gpu(helpers: dict, arguments: list[str], *, n_gpu: int) -> 
     runner_module = SimpleNamespace(**official_runner)
     _bind_3114_rowpair_runner(runner_module, rowpair_adapter)
     print(
-        "[mn-cofolding-af3-opt] big devices=2 sharding=rowpair model=alphafold3 "
+        f"[mn-cofolding-af3-opt] big devices=2 sharding=rowpair model={model_name} "
         "trunk=row_sharded heads=stock-3.1.14",
         flush=True,
     )

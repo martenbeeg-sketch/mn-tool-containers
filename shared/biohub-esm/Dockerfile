@@ -22,6 +22,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         python3 \
+        python3-dev \
         python3-pip \
         python3-venv \
     && rm -rf /var/lib/apt/lists/*

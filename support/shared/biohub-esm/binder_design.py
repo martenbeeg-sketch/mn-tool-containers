@@ -95,7 +95,12 @@ def main() -> None:
     engine.esmc_model = esmc_model
 
     target_sequence = str(config["target_sequence"]).strip().upper()
-    binder_prompt = "#" * int(config["binder_length"])
+    binder_name = str(config.get("binder_name") or "custom")
+    binder_prompt = config.get("binder_sequence")
+    if binder_prompt is not None:
+        binder_prompt = str(binder_prompt).strip().upper()
+    is_antibody = bool(config.get("is_antibody", False))
+    hotspot_ids = [str(item) for item in (config.get("target_hotspot_ids") or [])]
     designs: list[dict[str, Any]] = []
     trajectory_rows: list[dict[str, Any]] = []
     fasta_lines: list[str] = []
@@ -103,11 +108,14 @@ def main() -> None:
     for design_index in range(1, int(config["num_designs"]) + 1):
         seed = int(config["seed"]) + design_index - 1
         sequences, trajectory, critic_results = engine.design(
+            target_name="custom",
+            binder_name=binder_name,
             target_sequence=target_sequence,
             binder_sequence=binder_prompt,
-            is_antibody=False,
+            is_antibody=is_antibody,
             seed=seed,
             batch_size=1,
+            target_hotspot_ids=hotspot_ids or None,
         )
         binder_sequence = sequences[0].split("|")[-1]
         fasta_lines.extend([f">esmfold2_design_{design_index:05d}", binder_sequence])
@@ -148,6 +156,8 @@ def main() -> None:
                 "seed": seed,
                 "binder_sequence": binder_sequence,
                 "binder_length": len(binder_sequence),
+                "binder_type": config.get("binder_type", "miniprotein"),
+                "binder_framework": config.get("binder_framework"),
                 "critics": critics,
             }
         )
@@ -159,6 +169,7 @@ def main() -> None:
                 "profile": "lean_shared_model",
                 "model": model_name,
                 "optimization_steps": tutorial.STEPS,
+                "binder_type": config.get("binder_type", "miniprotein"),
                 "designs": designs,
             },
             indent=2,

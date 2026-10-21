@@ -28,6 +28,9 @@ For a reusable process to benchmark separate `off`, `fast`, and `big` runtime
 modes on the dual RTX 4090 host, see the
 [model-container optimization playbook](OPTIMIZATION_PLAYBOOK.md).
 
+For shared RTX 4090 / RTX 5090 image policy and the current engine build
+profiles, see [GPU compatibility](docs/GPU_COMPATIBILITY.md).
+
 Builds fetch upstream source at pinned revisions. The Protein Design Biohub
 ESM image, `mn-biohub-esm:3.4.1-cu128`, installs pinned PyPI releases of
 PyTorch and `esm` and fetches the matching binder-design tutorial from a pinned
@@ -95,6 +98,12 @@ levers active. Fast mode also selects a 32-key tile for the fused MSA pair
 attention on these classes; the kit's default 64-key tile exceeds the RTX 4090
 per-block shared-memory limit. This keeps the fused path active and is reported
 in the run counters.
+
+RFantibody uses one CUDA 12.8 image for RTX 4090 and RTX 5090. Its RFdiffusion,
+ProteinMPNN, and RF2 checkpoints are stored in
+`/mnt/db/reference_files/rfantibody/` and mounted read-only at `/ref/rfantibody`;
+they are not duplicated in the image. The old CUDA 11.8 recipe remains a
+fallback until the shared DGL build is verified on both GPU generations.
 
 Chai-1 uses its own pinned `chai_lab 0.6.1` optimization-kit image, built with
 `./build.sh chai1-opt`. It keeps the eight stock Chai checkpoint files outside

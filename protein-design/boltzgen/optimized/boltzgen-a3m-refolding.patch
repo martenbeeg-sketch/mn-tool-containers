@@ -1,0 +1,261 @@
+diff --git a/src/boltzgen/task/predict/data_from_generated.py b/src/boltzgen/task/predict/data_from_generated.py
+index 7bc3c5b..753847b 100644
+--- a/src/boltzgen/task/predict/data_from_generated.py
++++ b/src/boltzgen/task/predict/data_from_generated.py
+@@ -1,4 +1,6 @@
+ from dataclasses import dataclass
++import gzip
++from io import StringIO
+ from pathlib import Path
+ import random
+ import re
+@@ -20,6 +22,7 @@ from boltzgen.data.feature.featurizer import Featurizer
+ from boltzgen.data.mol import load_canonicals, load_molecules
+ from boltzgen.data.pad import pad_to_max
+ from boltzgen.data.parse import mmcif
++from boltzgen.data.parse.a3m import _process_a3m
+ from boltzgen.data.parse.pdb_parser import parse_pdb
+ from boltzgen.data.template.features import (
+     load_dummy_templates,
+@@ -32,6 +35,127 @@ class DataFetchException(Exception):
+     pass
+ 
+ 
++def _project_external_a3m(path: Path, structure_residues: np.ndarray, max_seqs: int):
++    """Load an A3M and project its columns onto residues present in a structure.
++
++    External MSAs usually describe the full protein sequence, while a PDB/mmCIF
++    only contains residues with resolved coordinates. This maps every resolved
++    coordinate residue to the query and selects the corresponding alignment
++    columns before BoltzGen builds MSA features.
++    """
++    opener = gzip.open if path.suffix == ".gz" else open
++    with opener(path, "rt") as handle:
++        records = []
++        current_header = None
++        current_sequence = []
++        for raw_line in handle:
++            line = raw_line.strip()
++            if not line or line.startswith("#"):
++                continue
++            if line.startswith(">"):
++                if current_header is not None:
++                    records.append((current_header, "".join(current_sequence)))
++                current_header = line
++                current_sequence = []
++            elif current_header is None:
++                raise ValueError(f"A3M sequence appeared before a header: {path}")
++            else:
++                current_sequence.append(line)
++        if current_header is not None:
++            records.append((current_header, "".join(current_sequence)))
++
++    if not records or not records[0][1]:
++        raise ValueError(f"External A3M has no query sequence: {path}")
++
++    # A3M lowercase letters are insertions and are omitted by BoltzGen's parser.
++    aligned_rows = [
++        "".join(char for char in sequence if not char.islower())
++        for _, sequence in records
++    ]
++    query_alignment = aligned_rows[0].upper()
++    query_columns = [idx for idx, char in enumerate(query_alignment) if char != "-"]
++    query_letters = [query_alignment[idx] for idx in query_columns]
++    if any(len(row) != len(query_alignment) for row in aligned_rows):
++        raise ValueError(f"A3M rows do not share an aligned width: {path}")
++    if not query_letters:
++        raise ValueError(f"External A3M query contains no residues: {path}")
++
++    def token_id(letter: str) -> int:
++        token_name = const.prot_letter_to_token.get(letter.upper(), "UNK")
++        return const.token_ids.get(token_name, const.token_ids["UNK"])
++
++    query_tokens = [token_id(letter) for letter in query_letters]
++    structure_tokens = [int(token) for token in structure_residues]
++    q_len, s_len = len(query_tokens), len(structure_tokens)
++    if not s_len:
++        raise ValueError(f"Cannot project an A3M onto an empty structure chain: {path}")
++
++    # Semi-global alignment: unresolved query residues are cheap to skip, while
++    # every coordinate residue must map to a query position. Query termini are
++    # free because structures commonly omit terminal residues.
++    neg_inf = -1.0e12
++    dp = [[neg_inf] * (s_len + 1) for _ in range(q_len + 1)]
++    trace = [[None] * (s_len + 1) for _ in range(q_len + 1)]
++    for i in range(q_len + 1):
++        dp[i][0] = 0.0
++        trace[i][0] = "Q"
++    for j in range(1, s_len + 1):
++        dp[0][j] = dp[0][j - 1] - 8.0
++        trace[0][j] = "S"
++
++    for i in range(1, q_len + 1):
++        for j in range(1, s_len + 1):
++            q_token = query_tokens[i - 1]
++            s_token = structure_tokens[j - 1]
++            is_match = q_token == s_token or q_token == const.token_ids["UNK"] or s_token == const.token_ids["UNK"]
++            choices = (
++                (dp[i - 1][j - 1] + (3.0 if is_match else -4.0), "D"),
++                (dp[i - 1][j] - 0.5, "Q"),
++                (dp[i][j - 1] - 8.0, "S"),
++            )
++            dp[i][j], trace[i][j] = max(choices, key=lambda item: item[0])
++
++    i = max(range(q_len + 1), key=lambda query_end: dp[query_end][s_len])
++    j = s_len
++    mapped_query_positions = [None] * s_len
++    while j > 0:
++        move = trace[i][j]
++        if move == "D":
++            mapped_query_positions[j - 1] = i - 1
++            i -= 1
++            j -= 1
++        elif move == "Q":
++            i -= 1
++        elif move == "S":
++            j -= 1
++        else:
++            raise ValueError(f"Could not align A3M query to structure chain: {path}")
++
++    if any(position is None for position in mapped_query_positions):
++        raise ValueError(f"Could not map all structure residues to A3M query: {path}")
++    compatible = sum(
++        query_tokens[position] == structure_tokens[index]
++        or query_tokens[position] == const.token_ids["UNK"]
++        or structure_tokens[index] == const.token_ids["UNK"]
++        for index, position in enumerate(mapped_query_positions)
++    )
++    identity = compatible / s_len
++    if identity < 0.95:
++        raise ValueError(
++            f"A3M query matches only {identity:.1%} of resolved structure residues; "
++            f"expected at least 95%: {path}"
++        )
++
++    projected = []
++    for (header, _), row in zip(records, aligned_rows):
++        projected_row = "".join(row[query_columns[position]] for position in mapped_query_positions)
++        projected.extend((header, projected_row))
++    msa = _process_a3m(StringIO("\n".join(projected)), max_seqs=max_seqs)
++    if len(msa.sequences) == 0:
++        raise ValueError(f"External A3M has no usable sequences after projection: {path}")
++    return msa, identity, q_len
++
++
+ @dataclass
+ class DataConfig:
+     """Data configuration."""
+@@ -55,6 +179,8 @@ class DataConfig:
+     backbone_only: bool = False
+     atom14: bool = True
+     max_seqs: int = 1
++    external_msa_dir: Optional[str] = None
++    external_msa_max_seqs: int = 1024
+     inverse_fold: bool = False
+     extra_mol_dir: Optional[str] = None
+     disulfide_prob: float = 1.0
+@@ -206,6 +332,8 @@ class FromGeneratedDataset(torch.utils.data.Dataset):
+         backbone_only: bool = False,
+         atom14: bool = True,
+         max_seqs: int = 1,
++        external_msa_dir: Optional[Path] = None,
++        external_msa_max_seqs: int = 1024,
+         inverse_fold: bool = False,
+         extra_mol_dir: Optional[Path] = None,
+         extra_features: Optional[List[str]] = None,
+@@ -241,6 +369,10 @@ class FromGeneratedDataset(torch.utils.data.Dataset):
+         self.backbone_only = backbone_only
+         self.atom14 = atom14
+         self.max_seqs = max_seqs
++        self.external_msa_dir = external_msa_dir
++        self.external_msa_max_seqs = int(external_msa_max_seqs)
++        if self.external_msa_max_seqs < 1:
++            raise ValueError("external_msa_max_seqs must be at least 1")
+         self.inverse_fold = inverse_fold
+         self.extra_mol_dir = extra_mol_dir
+         self.extra_features = (
+@@ -468,13 +600,48 @@ class FromGeneratedDataset(torch.utils.data.Dataset):
+         if self.design:
+             tokenized.tokens["design_mask"] = torch.from_numpy(design_mask).bool()
+ 
++        # Load optional chain-specific A3Ms staged beside the generated input.
++        # The path is external_msa_dir/<input-stem>/<chain-name>.a3m. Query
++        # columns are projected onto resolved structure residues, since native
++        # coordinate files often omit unresolved terminal or loop residues.
++        # Chains without an A3M retain BoltzGen's dummy MSA.
++        external_msa = {}
++        feature_max_seqs = self.max_seqs
++        if self.external_msa_dir is not None:
++            msa_item_dir = self.external_msa_dir / path.stem
++            for chain in structure.chains:
++                chain_name = str(chain["name"].item())
++                msa_path = msa_item_dir / f"{chain_name}.a3m"
++                if not msa_path.is_file():
++                    continue
++                residue_start = int(chain["res_idx"])
++                residue_end = residue_start + int(chain["res_num"])
++                structure_residues = structure.residues[residue_start:residue_end]["res_type"]
++                chain_msa, identity, query_len = _project_external_a3m(
++                    msa_path,
++                    structure_residues,
++                    max_seqs=self.external_msa_max_seqs,
++                )
++                asym_id = int(chain["asym_id"])
++                external_msa[asym_id] = chain_msa
++                print(
++                    f"[boltzgen-external-msa] chain={chain_name} asym_id={asym_id} "
++                    f"loaded_rows={len(chain_msa.sequences)} "
++                    f"row_cap={self.external_msa_max_seqs} query_len={query_len} "
++                    f"resolved_len={len(structure_residues)} "
++                    f"identity={identity:.1%} file={msa_path}",
++                    flush=True,
++                )
++            if external_msa:
++                feature_max_seqs = self.external_msa_max_seqs
++
+         # Finalize input data
+         input_data = Input(
+             tokens=tokenized.tokens,
+             bonds=tokenized.bonds,
+             token_to_res=tokenized.token_to_res,
+             structure=structure,
+-            msa={},
++            msa=external_msa,
+             templates=None,
+         )
+ 
+@@ -485,7 +652,7 @@ class FromGeneratedDataset(torch.utils.data.Dataset):
+                 molecules=molecules,
+                 random=np.random.default_rng(None),
+                 training=False,
+-                max_seqs=self.max_seqs,
++                max_seqs=feature_max_seqs,
+                 backbone_only=self.backbone_only,
+                 atom14=self.atom14,
+                 design=True,
+@@ -643,6 +810,12 @@ class FromGeneratedDataModule(pl.LightningDataModule):
+                 backbone_only=self.cfg.backbone_only,
+                 atom14=self.cfg.atom14,
+                 max_seqs=self.cfg.max_seqs,
++                external_msa_dir=(
++                    Path(self.cfg.external_msa_dir)
++                    if self.cfg.external_msa_dir
++                    else None
++                ),
++                external_msa_max_seqs=self.cfg.external_msa_max_seqs,
+                 inverse_fold=self.cfg.inverse_fold,
+                 extra_features=self.extra_features,
+                 disulfide_prob=self.disulfide_prob,
+@@ -899,6 +1072,12 @@ class FromGeneratedDataModule(pl.LightningDataModule):
+             backbone_only=self.cfg.backbone_only,
+             atom14=self.cfg.atom14,
+             max_seqs=self.cfg.max_seqs,
++            external_msa_dir=(
++                Path(self.cfg.external_msa_dir)
++                if self.cfg.external_msa_dir
++                else None
++            ),
++            external_msa_max_seqs=self.cfg.external_msa_max_seqs,
+             inverse_fold=self.cfg.inverse_fold,
+             extra_mol_dir=design_dir / const.molecules_dirname,
+             extra_features=self.extra_features,

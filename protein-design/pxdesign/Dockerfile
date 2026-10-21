@@ -47,11 +47,12 @@ RUN python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
         posix_ipc \
         einops \
         transformers==4.51.3 \
-        "jax[cuda12]==0.4.29" \
         optax==0.2.5 \
         dm-haiku==0.0.13 \
         natsort \
         dm-tree \
+    && python -m pip install --no-cache-dir --upgrade "jax[cuda12]==0.5.3" \
+        -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html \
     && python -m pip install --no-cache-dir git+https://github.com/bytedance/Protenix.git@v0.5.0+pxd --no-deps \
     && python -m pip install --no-cache-dir git+https://github.com/sokrypton/ColabDesign.git --no-deps \
     && python -m pip install --no-cache-dir git+https://github.com/bytedance/PXDesignBench.git@v0.1.2 --no-deps \
@@ -62,10 +63,14 @@ RUN git clone -b v3.5.1 --depth 1 https://github.com/NVIDIA/cutlass.git /opt/cut
 COPY --from=app /containers/pxdesign/entrypoint.sh /usr/local/bin/pxdesign-entrypoint
 
 ENV CUTLASS_PATH=/opt/cutlass \
+    TORCH_CUDA_ARCH_LIST="8.9;12.0+PTX" \
     PROTENIX_DATA_ROOT_DIR=/ref/pxdesign/release_data/ccd_cache \
     TOOL_WEIGHTS_ROOT=/ref/pxdesign/tool_weights \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+RUN python -m pip install --no-cache-dir --upgrade "jax[cuda12]==0.5.3" \
+    -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
 
 RUN chmod +x /usr/local/bin/pxdesign-entrypoint
 

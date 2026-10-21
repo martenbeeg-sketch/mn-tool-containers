@@ -21,6 +21,8 @@ docker run --rm --gpus '"device=0"' \
 ```
 
 The app's current AF2 initial-guess evaluator uses ColabDesign and its own
-input/output and metric contract. It is not interchangeable with this kit's
-`predict_pdb.py` runner, so the app continues using its existing image and
-workflow for AF2-IG. This candidate does not replace that path.
+input/output and metric contract. That separate workflow includes a target-only
+template path (target PDB plus binder-sequence sidecar) and full-complex paths
+with optional binder and interface templates. It is not interchangeable with
+this kit's `predict_pdb.py` runner, which currently consumes binder-first
+binder–target PDBs. This candidate does not replace the app workflow.
