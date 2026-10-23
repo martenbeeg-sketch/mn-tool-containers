@@ -1,0 +1,15 @@
+ARG BASE_IMAGE=mn-docking-suite:cu128
+
+FROM ${BASE_IMAGE} AS patched-build
+WORKDIR /opt/unidock/UniDock-Pro
+COPY unidock-pro-sm120-shared-memory.patch /tmp/unidock-pro-sm120-shared-memory.patch
+RUN git apply /tmp/unidock-pro-sm120-shared-memory.patch && \
+    cmake -B build -DCMAKE_CUDA_ARCHITECTURES="89-real;120-real;120-virtual" && \
+    cmake --build build -j"$(nproc)" && \
+    cuobjdump --list-elf build/udp | grep -q 'sm_120'
+
+FROM ${BASE_IMAGE}
+LABEL org.opencontainers.image.title="MN docking suite with UniDock Pro SM120 fix" \
+      org.opencontainers.image.unidock.source-commit="a077b20e72ec00360b1e6578bbff7afc087b17c7" \
+      org.opencontainers.image.unidock.patch="sm120-warp-shared-memory-v1"
+COPY --from=patched-build /opt/unidock/UniDock-Pro/build/udp /opt/unidock/UniDock-Pro/build/udp

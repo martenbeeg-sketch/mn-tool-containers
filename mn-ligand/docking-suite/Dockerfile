@@ -13,7 +13,9 @@ ARG GNINA_SOURCE_COMMIT=e76ee4ee59cb9932c3d0a3a97edd0ca980d10f6d
 ARG UNIDOCK_SOURCE_COMMIT=a077b20e72ec00360b1e6578bbff7afc087b17c7
 
 LABEL org.opencontainers.image.title="AVGU docking suite for mn-ligand" \
-      org.opencontainers.image.description="GNINA, Uni-Dock Pro and AutoDock Vina on CUDA 12.8 for NVIDIA Blackwell"
+      org.opencontainers.image.description="GNINA, Uni-Dock Pro and AutoDock Vina on CUDA 12.8 for NVIDIA Blackwell" \
+      org.opencontainers.image.unidock.source-commit="${UNIDOCK_SOURCE_COMMIT}" \
+      org.opencontainers.image.unidock.patch="sm120-warp-shared-memory-v1"
 
 ENV NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
@@ -139,7 +141,9 @@ WORKDIR /opt/unidock
 RUN git clone https://github.com/NiBoyang/UniDock-Pro.git && \
     git -C UniDock-Pro checkout --detach "${UNIDOCK_SOURCE_COMMIT}"
 WORKDIR /opt/unidock/UniDock-Pro
-RUN cmake -B build -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" && \
+COPY mn-ligand/docking-suite/unidock-pro-sm120-shared-memory.patch /tmp/unidock-pro-sm120-shared-memory.patch
+RUN git apply /tmp/unidock-pro-sm120-shared-memory.patch && \
+    cmake -B build -DCMAKE_CUDA_ARCHITECTURES="${CUDA_ARCHITECTURES}" && \
     cmake --build build -j$(nproc) && \
     cuobjdump --list-elf build/udp | grep -q 'sm_120'
 ENV PATH="/opt/unidock/UniDock-Pro/build:${PATH}"
