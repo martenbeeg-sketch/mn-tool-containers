@@ -14,6 +14,7 @@ ARG UNIDOCK_SOURCE_COMMIT=a077b20e72ec00360b1e6578bbff7afc087b17c7
 
 LABEL org.opencontainers.image.title="AVGU docking suite for mn-ligand" \
       org.opencontainers.image.description="GNINA, Uni-Dock Pro and AutoDock Vina on CUDA 12.8 for NVIDIA Blackwell" \
+      org.opencontainers.image.molscrub.protocols="0.1.0,0.3.0" \
       org.opencontainers.image.unidock.source-commit="${UNIDOCK_SOURCE_COMMIT}" \
       org.opencontainers.image.unidock.patch="sm120-warp-shared-memory-v1"
 
@@ -60,6 +61,18 @@ RUN micromamba install -y -p /opt/conda -c conda-forge \
  && micromamba clean -a -y
 
 RUN micromamba run -p /opt/conda python -m pip install --no-cache-dir py3Dmol molscrub pytest
+
+# Keep the benchmarked MolScrub releases side by side. The regular image
+# environment remains unchanged for other tools; docking jobs select one of
+# these isolated launchers through the Studio ligand-preparation protocol.
+RUN set -euo pipefail; \
+    for version in 0.1.0 0.3.0; do \
+      venv="/opt/molscrub/venvs/${version}"; \
+      python -m venv --system-site-packages "${venv}"; \
+      "${venv}/bin/pip" install --no-cache-dir "molscrub==${version}"; \
+      "${venv}/bin/scrub.py" --help >/dev/null; \
+      "${venv}/bin/python" -c "from importlib.metadata import version; assert version('molscrub') == '${version}'"; \
+    done
 
 # ------------------------------------------------------------
 # ProDy installation
