@@ -69,7 +69,7 @@ RUN set -euo pipefail; \
     for version in 0.1.0 0.3.0; do \
       venv="/opt/molscrub/venvs/${version}"; \
       python -m venv --system-site-packages "${venv}"; \
-      "${venv}/bin/pip" install --no-cache-dir "molscrub==${version}"; \
+      "${venv}/bin/pip" install --disable-pip-version-check --ignore-installed --no-deps --no-cache-dir "molscrub==${version}"; \
       "${venv}/bin/scrub.py" --help >/dev/null; \
       "${venv}/bin/python" -c "from importlib.metadata import version; assert version('molscrub') == '${version}'"; \
     done

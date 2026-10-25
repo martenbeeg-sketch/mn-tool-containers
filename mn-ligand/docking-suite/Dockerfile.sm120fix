@@ -10,6 +10,18 @@ RUN git apply /tmp/unidock-pro-sm120-shared-memory.patch && \
 
 FROM ${BASE_IMAGE}
 LABEL org.opencontainers.image.title="MN docking suite with UniDock Pro SM120 fix" \
+      org.opencontainers.image.molscrub.protocols="0.1.0,0.3.0" \
       org.opencontainers.image.unidock.source-commit="a077b20e72ec00360b1e6578bbff7afc087b17c7" \
       org.opencontainers.image.unidock.patch="sm120-warp-shared-memory-v1"
 COPY --from=patched-build /opt/unidock/UniDock-Pro/build/udp /opt/unidock/UniDock-Pro/build/udp
+
+# Keep both measured MolScrub releases in isolated launch environments while
+# inheriting all CUDA and docking dependencies from the verified base image.
+RUN set -euo pipefail; \
+    for version in 0.1.0 0.3.0; do \
+      venv="/opt/molscrub/venvs/${version}"; \
+      python -m venv --system-site-packages "${venv}"; \
+      "${venv}/bin/pip" install --disable-pip-version-check --ignore-installed --no-deps --no-cache-dir "molscrub==${version}"; \
+      "${venv}/bin/python" -c "from importlib.metadata import version; assert version('molscrub') == '${version}'"; \
+      "${venv}/bin/scrub.py" --help >/dev/null; \
+    done

@@ -1,0 +1,16 @@
+# Add the benchmarked MolScrub releases to an existing docking image without
+# changing its CUDA, UniDock-Pro, GNINA, Vina, or AutoDock-GPU layers.
+ARG BASE_IMAGE=mn-docking-suite:cu128-sm120fix
+FROM ${BASE_IMAGE}
+
+LABEL org.opencontainers.image.title="MN docking suite with pinned MolScrub versions" \
+      org.opencontainers.image.molscrub.protocols="0.1.0,0.3.0"
+
+RUN set -euo pipefail; \
+    for version in 0.1.0 0.3.0; do \
+      venv="/opt/molscrub/venvs/${version}"; \
+      python -m venv --system-site-packages "${venv}"; \
+      "${venv}/bin/pip" install --disable-pip-version-check --ignore-installed --no-deps --no-cache-dir "molscrub==${version}"; \
+      "${venv}/bin/python" -c "from importlib.metadata import version; assert version('molscrub') == '${version}'"; \
+      "${venv}/bin/scrub.py" --help >/dev/null; \
+    done
