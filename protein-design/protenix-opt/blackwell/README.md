@@ -47,3 +47,33 @@ Raw validation evidence is kept under
 `/mnt/data/RESULTS/mn-molecular-design-studio/verification/protenix-blackwell-image-20261029`.
 The Phase 7B acceptance report in the Studio repository records final deployment
 and scientific acceptance status.
+
+
+## Validation on 29 October 2026
+
+All 48 kernel checks passed on the local RTX 4090 and both peer RTX 5090s.
+The same image fingerprint is installed on all three workstations. Normal Studio
+graph execution produced two genuine predictions from the same retained PD-L1
+115-aa target / 106-aa binder, with seed 42, 10 recycles, 200 diffusion steps,
+one bfloat16 sample, no MSA and no template. No new design was generated.
+
+| GPU | Model forward | iPTM | pTM |
+| --- | --- | --- | --- |
+| RTX 4090 | 13.71 s | 0.25146 | 0.58199 |
+| RTX 5090 | 7.39 s | 0.25138 | 0.58415 |
+
+These are single-input observations, not a speed benchmark or native acceptance.
+Exact sequence/target identity, two native processes/initializations, Results,
+artifact download and ZIP checksums passed. A Results-only replay reused both
+predictions without another native invocation. The standard `batch-api` build
+also creates this SM120 follow-on after its preserved batch2 base.
+
+**Structural equivalence is unverified.** The close confidence scores coexist
+with 6.368 Å all-residue complex Cα RMSD and 14.158 Å target-aligned binder pose
+RMSD between GPUs. Old versus new 4090 results also differ. The retained protocol
+did not request deterministic algorithms; the cause of the pose variation has
+not been isolated. No quality-equivalence or improved binding claim is made.
+Per-row checkpoint provenance remains an existing export limitation; actual
+checkpoint hashes were checked independently on all three hosts.
+
+Portable measurements and hashes: [verification-20261029.json](verification-20261029.json).

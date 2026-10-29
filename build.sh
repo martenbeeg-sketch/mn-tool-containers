@@ -630,6 +630,7 @@ case "$APP" in
     bash "$ROOT/build.sh" opendde-opt-batch2
     bash "$ROOT/build.sh" protenix-v1-opt-batch2
     bash "$ROOT/build.sh" protenix-v2-opt-batch2
+    bash "$ROOT/build.sh" protenix-v2-opt-sm120
     bash "$ROOT/build.sh" boltzgen-opt-batch3
     bash "$ROOT/build.sh" alphafast-batch
     bash "$ROOT/build.sh" boltz2-stock-batch

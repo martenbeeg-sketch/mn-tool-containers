@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-29",
+  "status": "stock execution compatibility validated; numerical equivalence not certified",
+  "image": "mn-protenix-opt:2.0.0-cu128-sm89-sm120-batch3",
+  "distribution": [
+    {
+      "host": "pc002975",
+      "image_id": "sha256:7468360d31b45bdfd9f7c6a1fbb1196d232e3bb31f27a98a3c8aca8525be75ab",
+      "content_fingerprint": "sha256:d9d00bf5909b607c65b7d9aaeb57c4c7a50e5a40bd0d110da2ea5ccc266fecb4"
+    },
+    {
+      "host": "pc004032",
+      "image_id": "sha256:bb9be7ffb4a4289ab1b68f8ae33e896dc5a0f2c772c50ea5ea2362be09fc0121",
+      "content_fingerprint": "sha256:d9d00bf5909b607c65b7d9aaeb57c4c7a50e5a40bd0d110da2ea5ccc266fecb4"
+    },
+    {
+      "host": "pc004033",
+      "image_id": "sha256:bb9be7ffb4a4289ab1b68f8ae33e896dc5a0f2c772c50ea5ea2362be09fc0121",
+      "content_fingerprint": "sha256:d9d00bf5909b607c65b7d9aaeb57c4c7a50e5a40bd0d110da2ea5ccc266fecb4"
+    }
+  ],
+  "build_manifest": {
+    "fix": "stock-layernorm-sm120-v1",
+    "original_compiler_sha256": "1237b09c7a3f3494429d1dbb6547aad66a0682b199b3274e7d2e18b975ce2c1d",
+    "compiler_sha256": "da802b470de09702915293d5e92c935ca295db05453079468a7d230af72fe5fc",
+    "binary": "/opt/Protenix/protenix/model/layer_norm/fast_layer_norm_cuda_v2.so",
+    "binary_sha256": "5aad24cec735c5f7d7f4c1ab7eb1616ffb1ef5d30e3cc990737615864d620885",
+    "native_targets": [
+      "sm_70",
+      "sm_80",
+      "sm_86",
+      "sm_89",
+      "sm_90",
+      "sm_100",
+      "sm_120"
+    ]
+  },
+  "kernel_checks": {
+    "pc002975_RTX4090": 48,
+    "pc004032_RTX5090": 48,
+    "pc004033_RTX5090": 48
+  },
+  "scientific_inputs": 2,
+  "new_design_generation": 0,
+  "native_invocations": 2,
+  "model_initializations_verified_in_logs": 2,
+  "successful_predictions": 2,
+  "native_model_forward_seconds": {
+    "pc002975": 13.71,
+    "pc004033": 7.39
+  },
+  "scores": {
+    "predictor-5090": {
+      "iptm": 0.25138,
+      "ptm": 0.58415,
+      "plddt_mean": 70.668,
+      "ranking_score": 0.31794
+    },
+    "predictor-4090": {
+      "iptm": 0.25146,
+      "ptm": 0.58199,
+      "plddt_mean": 70.645,
+      "ranking_score": 0.31757
+    }
+  },
+  "structural_comparison": {
+    "complex_ca_rmsd_angstrom": 6.367720127105713,
+    "target_ca_rmsd_angstrom": 4.238437175750732,
+    "target_aligned_binder_ca_rmsd_angstrom": 14.158032417297363
+  },
+  "old_vs_new_4090_comparison": {
+    "complex_ca_rmsd_angstrom": 5.576989650726318,
+    "target_ca_rmsd_angstrom": 1.4135024547576904,
+    "target_aligned_binder_ca_rmsd_angstrom": 9.991076469421387
+  },
+  "image_mode": "off",
+  "optimized_modes_validated": [],
+  "source_and_binder_sequence_identity": "pass",
+  "native_filter": "not_evaluated",
+  "checkpoint_sha256": "8f931f9774a396b67033d0e58628e1834f4a1448165e04254b40a780b0c0d599",
+  "checkpoint_export_in_prediction_rows": "empty; independently verified per host",
+  "results_export": {
+    "bytes": 671304,
+    "sha256": "a2164076f1c1e25ec54f4edd353219adc10a62ccde0cc33027aaca4825964a83",
+    "entries": 49,
+    "checksum_entries": 17,
+    "verified": true
+  },
+  "evidence_root": "/mnt/data/RESULTS/mn-molecular-design-studio/verification/protenix-blackwell-image-20261029"
+}
