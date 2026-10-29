@@ -22,7 +22,7 @@ BOLTZGEN_OPT_TOOLS="$PROJECTS/tools-to-implement/uplifting-biomolecular-modeling
 RFANTIBODY_TOOLS="$PROJECTS/tools-to-implement/RFantibody"
 
 usage() {
-  printf 'Usage: %s {mn-protein-design|mn-ligand|mn-cofolding|bioemu2|boltz2-opt|rf3-opt|boltz2-opt-batch|boltz2-opt-batch2|rf3-opt-batch|af3-torch-opt-batch|af3-torch-opt-batch2|af3-torch-opt-batch3|alphafold3-batch|openfold3-batch|esmfold2-opt-batch|esmfold2-fast-opt-batch|chai1-opt-batch|atlasfold-opt-batch|atlasfold-opt-batch2|colabfold-batch|colabfold-batch2|colabfold-batch3|colabfold-opt-batch|colabfold-opt-batch2|colabfold-opt-batch3|openfold3-ob0-batch|openfold3-ob0-batch2|opendde-opt-batch|opendde-opt-batch2|opendde-opt-batch3|protenix-v1-opt-batch|protenix-v1-opt-batch2|protenix-v2-opt-batch|protenix-v2-opt-batch2|boltzgen-opt-batch|boltzgen-opt-batch2|boltzgen-opt-batch3|alphafast-batch|boltz2-stock-batch|biohub-esm-batch|openfold3-p2-batch|openfold3-p2-batch2|pxdesign-v05-batch|pxdesign-v05-batch2|pxdesign-v05-batch3|pxdesign-v05-batch4|pxdesign-v05-batch5|pxdesign-v05-batch6|protenix-v2-stock-batch|protenix-v2-stock-batch2|foundry-rf3-batch|foundry-rf3-batch2|batch-api|colabfold-opt|af2ig-opt|esmfold-v1|esmfold2-opt|chai1-opt|atlasfold-opt|openfold3-ob0|opendde-opt|protenix-v1-opt|af3-torch-opt|boltzgen-opt|rfantibody|genie3|pxdesign}\n' "$0" >&2
+  printf 'Usage: %s {mn-protein-design|mn-ligand|mn-cofolding|bioemu2|boltz2-opt|rf3-opt|boltz2-opt-batch|boltz2-opt-batch2|rf3-opt-batch|af3-torch-opt-batch|af3-torch-opt-batch2|af3-torch-opt-batch3|alphafold3-batch|openfold3-batch|esmfold2-opt-batch|esmfold2-fast-opt-batch|chai1-opt-batch|atlasfold-opt-batch|atlasfold-opt-batch2|colabfold-batch|colabfold-batch2|colabfold-batch3|colabfold-opt-batch|colabfold-opt-batch2|colabfold-opt-batch3|openfold3-ob0-batch|openfold3-ob0-batch2|opendde-opt-batch|opendde-opt-batch2|opendde-opt-batch3|protenix-v1-opt-batch|protenix-v1-opt-batch2|protenix-v2-opt-batch|protenix-v2-opt-batch2|protenix-v2-opt-sm120|boltzgen-opt-batch|boltzgen-opt-batch2|boltzgen-opt-batch3|alphafast-batch|boltz2-stock-batch|biohub-esm-batch|openfold3-p2-batch|openfold3-p2-batch2|pxdesign-v05-batch|pxdesign-v05-batch2|pxdesign-v05-batch3|pxdesign-v05-batch4|pxdesign-v05-batch5|pxdesign-v05-batch6|protenix-v2-stock-batch|protenix-v2-stock-batch2|foundry-rf3-batch|foundry-rf3-batch2|batch-api|colabfold-opt|af2ig-opt|esmfold-v1|esmfold2-opt|chai1-opt|atlasfold-opt|openfold3-ob0|opendde-opt|protenix-v1-opt|af3-torch-opt|boltzgen-opt|rfantibody|genie3|pxdesign}\n' "$0" >&2
 }
 
 if [[ $# -ne 1 ]]; then
@@ -554,6 +554,9 @@ case "$APP" in
     ;;
   protenix-v2-opt-batch)
     build_batch_api_overlay mn-protenix-opt:2.0.0-cu128 protenix_v2_opt mn-protenix-opt:2.0.0-cu128-batch1
+    ;;
+  protenix-v2-opt-sm120)
+    bash "$ROOT/protein-design/protenix-opt/blackwell/build.sh"
     ;;
   protenix-v2-opt-batch2)
     build_batch_api_overlay mn-protenix-opt:2.0.0-cu128 protenix_v2_opt mn-protenix-opt:2.0.0-cu128-batch2

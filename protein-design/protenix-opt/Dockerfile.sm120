@@ -1,0 +1,11 @@
+# Preserve the existing model, batch API and optimization modes. Rebuild only
+# stock Protenix's fused LayerNorm, whose prior compiler omitted SM120.
+ARG BASE_IMAGE=mn-protenix-opt:2.0.0-cu128-batch2
+FROM ${BASE_IMAGE}
+ARG BASE_IMAGE_ID
+LABEL org.mn.protenix.fix="stock-layernorm-sm120-v1" \
+      org.mn.protenix.base-image-id="${BASE_IMAGE_ID}" \
+      org.mn.protenix.native-architectures="sm_70,sm_80,sm_86,sm_89,sm_90,sm_100,sm_120"
+COPY protein-design/protenix-opt/blackwell/rebuild_layernorm.py /opt/mn-protenix-fixes/rebuild_layernorm.py
+COPY protein-design/protenix-opt/blackwell/check_layernorm.py /opt/mn-protenix-fixes/check_layernorm.py
+RUN env -u PROTENIX_OPT_MODE MAX_JOBS=2 python /opt/mn-protenix-fixes/rebuild_layernorm.py
